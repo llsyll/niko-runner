@@ -1,0 +1,323 @@
+:root {
+    --bg-color: #000000;
+    --surface-color: #1c1c1e;
+    --primary-color: #0A84FF;
+    --text-primary: #FFFFFF;
+    --text-secondary: #8E8E93;
+    --accent-color: #30D158;
+    --danger-color: #FF453A;
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+body {
+    font-family: var(--font-family);
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.app-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    padding-bottom: env(safe-area-inset-bottom, 20px);
+    max-width: 600px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    height: 60px;
+}
+
+.logo {
+    font-weight: 900;
+    font-size: 1.2rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.icon-btn {
+    font-size: 1.5rem;
+    cursor: pointer;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+    padding: 10px;
+}
+
+.icon-btn:active {
+    opacity: 0.5;
+}
+
+main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 40px;
+    padding-bottom: 40px;
+}
+
+/* Timer Display */
+.timer-display {
+    text-align: center;
+    transition: color 0.3s ease;
+}
+
+#time-remaining {
+    font-size: 5rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -2px;
+    display: block;
+    line-height: 1;
+}
+
+.timer-label {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    margin-top: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* Controls */
+.controls-container {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 30px;
+}
+
+/* New BPM Controls */
+.bpm-control-wrapper {
+    width: 100%;
+    background: var(--surface-color);
+    padding: 20px;
+    border-radius: 25px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.bpm-display-group {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.bpm-value {
+    text-align: center;
+}
+
+#current-bpm {
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1;
+    display: block;
+}
+
+.bpm-value .label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.bpm-btn {
+    background: rgba(255, 255, 255, 0.08);
+    /* Distinct background */
+    border: none;
+    color: var(--text-primary);
+    font-size: 1.5rem;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.bpm-btn:active {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Slider Styling */
+.slider {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    background: #333;
+    border-radius: 3px;
+    outline: none;
+    margin: 10px 0;
+}
+
+.slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    background: var(--primary-color);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    border: 2px solid #fff;
+}
+
+.slider::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    background: var(--primary-color);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid #fff;
+}
+
+/* Main Button */
+.primary-btn {
+    background-color: var(--accent-color);
+    color: #000;
+    border: none;
+    font-size: 1.5rem;
+    font-weight: 700;
+    padding: 20px 0;
+    width: 100%;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: transform 0.1s, opacity 0.2s, background-color 0.3s;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 20px rgba(48, 209, 88, 0.3);
+}
+
+.primary-btn:active {
+    transform: scale(0.98);
+}
+
+.primary-btn.running {
+    background-color: var(--danger-color);
+    color: white;
+    box-shadow: 0 4px 20px rgba(255, 69, 58, 0.3);
+}
+
+/* Modal */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(10px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    opacity: 1;
+    transition: opacity 0.3s;
+}
+
+.modal.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.modal-content {
+    background: var(--surface-color);
+    padding: 30px;
+    border-radius: 25px;
+    width: 90%;
+    max-width: 380px;
+    text-align: center;
+}
+
+.modal-content h2 {
+    margin-bottom: 25px;
+    font-size: 1.3rem;
+}
+
+/* Duration Control Styles */
+.setting-item {
+    margin-bottom: 30px;
+}
+
+.setting-item label {
+    display: block;
+    margin-bottom: 15px;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.preset-chips {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.chip {
+    background: rgba(255, 255, 255, 0.08);
+    border: none;
+    color: var(--text-primary);
+    padding: 10px 0;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.chip.active {
+    background: var(--primary-color);
+    color: white;
+}
+
+.slider-container {
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.slider-container input {
+    margin-top: 15px;
+}
+
+.secondary-btn {
+    background: transparent;
+    border: 1px solid var(--text-secondary);
+    color: var(--text-primary);
+    padding: 12px 40px;
+    border-radius: 20px;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+/* Utilities */
+.hidden {
+    display: none !important;
+}
+
+.warning-state {
+    color: var(--danger-color) !important;
+}

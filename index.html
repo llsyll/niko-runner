@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Niko 超慢跑</title>
+    <meta name="description" content="超慢跑节拍器 & 计时助手">
+    <meta name="theme-color" content="#121212">
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Silent Audio Loop Trigger -->
+        <audio id="silent-audio" loop playsinline>
+            <source
+                src="data:audio/mp3;base64,SUQzBAAAAAABAFRYWFgAAAASAAADbWFqb3JfYnJhbmQAbXA0MgBUWFhYAAAAEQAAA21pbm9yX3ZlcnNpb24AMABUWFhYAAAAHAAAA2NvbXBhdGlibZVfYnJhbmRzAGlzb21tcDQyAFRTU0UAAAAPAAADTGF2ZjU5LjI3LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIwAAQUFBRUVFRkpKSk9PT1BQUFZWVltbW15eXmNjY2hoaGxsbHJycnd3d3x8fIWFhYqKioyMjJKSkpWVlZqamp+fn6Kioqenp62tra+vr7Kysre3t7y8vMHBwcTExMrKys/Pz9PT09ra2t/f3+Tk5Ojo6Ozs7PLy8vb29v///wAAAANMYXZjNTkuMzcuMTAwAAAAAAAAAAAAAAAAIAbAAAAAAAAAAAAAAAAB//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA"
+                type="audio/mpeg">
+        </audio>
+
+        <header>
+            <div class="logo">Niko 超慢跑</div>
+            <div id="settings-btn" class="icon-btn">⚙️</div>
+        </header>
+
+        <main>
+            <div class="timer-display">
+                <span id="time-remaining">30:00</span>
+                <div class="timer-label">剩余时间</div>
+            </div>
+
+            <div class="controls-container">
+                <div class="bpm-control-wrapper">
+                    <div class="bpm-display-group">
+                        <button id="bpm-decrease" class="bpm-btn sub-btn">-</button>
+                        <div class="bpm-value">
+                            <span id="current-bpm">180</span>
+                            <span class="label">BPM</span>
+                        </div>
+                        <button id="bpm-increase" class="bpm-btn sub-btn">+</button>
+                    </div>
+                    <input type="range" id="bpm-slider" min="150" max="200" value="180" class="slider">
+                </div>
+
+                <button id="start-btn" class="primary-btn">开始运动</button>
+            </div>
+        </main>
+
+        <div id="settings-modal" class="modal hidden">
+            <div class="modal-content">
+                <h2>设置</h2>
+                <div class="setting-item">
+                    <label>运动时长 (分钟)</label>
+                    <div class="duration-control-wrapper">
+                        <div class="preset-chips">
+                            <button class="chip" data-time="15">15</button>
+                            <button class="chip active" data-time="30">30</button>
+                            <button class="chip" data-time="45">45</button>
+                            <button class="chip" data-time="60">60</button>
+                        </div>
+                        <div class="slider-container">
+                            <span id="duration-value">30</span> 分钟
+                            <input type="range" id="duration-slider" min="5" max="120" step="5" value="30"
+                                class="slider">
+                        </div>
+                    </div>
+                </div>
+                <button id="close-settings" class="secondary-btn">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="main.js"></script>
+    <script src="sw.js"></script>
+</body>
+
+</html>
