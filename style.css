@@ -42,8 +42,8 @@ body {
     align-items: center;
     justify-content: space-between;
 
-    /* Increased top padding + Safe Area */
-    padding-top: max(60px, env(safe-area-inset-top));
+    /* Increased top padding + Safe Area - Extra buffer for notch */
+    padding-top: max(100px, calc(env(safe-area-inset-top) + 40px));
     padding-bottom: max(30px, env(safe-area-inset-bottom));
     padding-left: 24px;
     padding-right: 24px;
@@ -59,7 +59,8 @@ body {
     .app-container {
         border-radius: 0;
         max-width: 100%;
-        padding: 60px 20px 40px;
+        padding: 80px 20px 40px;
+        /* Fallback big top padding */
     }
 }
 
@@ -67,12 +68,15 @@ body {
 .progress-ring-container {
     position: relative;
     width: 100%;
-    aspect-ratio: 4/3;
-    max-height: 300px;
+    /* Remove aspect-ratio constraint, let it be sized by specific height or content */
+    height: 30vh;
+    max-height: 260px;
+    /* Reduced from 320px/300px */
     display: flex;
     justify-content: center;
     align-items: center;
     cursor: pointer;
+    margin-top: 10px;
 }
 
 .progress-ring {
