@@ -7,8 +7,11 @@ class NikoRunApp {
         // State
         this.isRunning = false;
         this.bpm = 180;
-        this.durationMinutes = 30;
-        this.timeLeft = this.durationMinutes * 60;
+        this.durationMinutes = 15; // Defaut to 15 based on first chip
+        this.initialDurationSecs = this.durationMinutes * 60;
+        this.timeLeft = this.initialDurationSecs;
+
+        // Audio & System
         this.wakeLock = null;
         this.audioContext = null;
         this.nextNoteTime = 0.0;
@@ -16,26 +19,32 @@ class NikoRunApp {
         this.scheduleAheadTime = 0.1;
         this.lookahead = 25.0;
 
-        // DOM Elements
+        // UI References
         this.els = {
             timeRemaining: document.getElementById('time-remaining'),
-            startBtn: document.getElementById('start-btn'),
-            currentBpm: document.getElementById('current-bpm'),
-            bpmDecrease: document.getElementById('bpm-decrease'),
-            bpmIncrease: document.getElementById('bpm-increase'),
+            playPauseArea: document.getElementById('play-pause-area'),
+            iconPlay: document.getElementById('icon-play'),
+            iconPause: document.getElementById('icon-pause'),
+            progressRect: document.getElementById('progress-rect'),
+
+            stopBtn: document.getElementById('stop-btn'),
+            startBtn: document.getElementById('start-btn'), // Added explicitly
+
+            bpmDisplay: document.getElementById('current-bpm'),
             bpmSlider: document.getElementById('bpm-slider'),
 
-            silentAudio: document.getElementById('silent-audio'),
-            settingsBtn: document.getElementById('settings-btn'),
-            settingsModal: document.getElementById('settings-modal'),
-            closeSettings: document.getElementById('close-settings'),
-
-            durationValue: document.getElementById('duration-value'),
-            durationSlider: document.getElementById('duration-slider'),
-            presetChips: document.querySelectorAll('.chip'),
-
-            timerLabel: document.querySelector('.timer-label')
+            chips: document.querySelectorAll('.chip'),
         };
+
+        // Ring Calculation
+        // Rect: width 280, height 180, rx 40
+        // Perimeter ~= 2*(w-2r) + 2*(h-2r) + 2*PI*r
+        const w = 280, h = 180, r = 40;
+        this.ringPerimeter = 2 * (w - 2 * r) + 2 * (h - 2 * r) + 2 * Math.PI * r;
+
+        // Set initial stroke dasharray
+        this.els.progressRect.style.strokeDasharray = `${this.ringPerimeter} ${this.ringPerimeter}`;
+        this.els.progressRect.style.strokeDashoffset = 0;
 
         this.init();
     }
@@ -43,50 +52,37 @@ class NikoRunApp {
     init() {
         this.addEventListeners();
         this.updateTimeDisplay();
+        this.updateBpm(this.bpm);
+
+        // Initialize chips state
+        this.updateDuration(15);
     }
 
     addEventListeners() {
-        // Start/Stop
+        // Play/Pause Toggle on Ring Click
+        this.els.playPauseArea.addEventListener('click', () => this.toggleRun());
+
+        // Start Button Click
         this.els.startBtn.addEventListener('click', () => this.toggleRun());
 
-        // BPM Controls (Buttons)
-        this.els.bpmDecrease.addEventListener('click', () => {
-            this.updateBpm(this.bpm - 1);
-        });
-        this.els.bpmIncrease.addEventListener('click', () => {
-            this.updateBpm(this.bpm + 1);
-        });
+        // Stop Button
+        this.els.stopBtn.addEventListener('click', () => this.stopAction());
 
-        // BPM Controls (Slider)
+        // BPM Slider
         this.els.bpmSlider.addEventListener('input', (e) => {
             this.updateBpm(parseInt(e.target.value, 10));
         });
 
-        // Settings Modal
-        this.els.settingsBtn.addEventListener('click', () => this.els.settingsModal.classList.remove('hidden'));
-        this.els.closeSettings.addEventListener('click', () => {
-            this.els.settingsModal.classList.add('hidden');
-            // If not running, update the timer display immediately based on new duration
-            if (!this.isRunning) {
-                this.timeLeft = this.durationMinutes * 60;
-                this.updateTimeDisplay();
-            }
-        });
-
-        // Duration Controls (Slider)
-        this.els.durationSlider.addEventListener('input', (e) => {
-            this.updateDuration(parseInt(e.target.value, 10));
-        });
-
-        // Duration Controls (Chips)
-        this.els.presetChips.forEach(chip => {
+        // Duration Chips
+        this.els.chips.forEach(chip => {
             chip.addEventListener('click', () => {
+                // Determine value
                 const val = parseInt(chip.dataset.time, 10);
                 this.updateDuration(val);
             });
         });
 
-        // Handle visibility change
+        // Visibility Change for Wake Lock
         document.addEventListener('visibilitychange', async () => {
             if (this.wakeLock !== null && document.visibilityState === 'visible') {
                 await this.requestWakeLock();
@@ -94,46 +90,68 @@ class NikoRunApp {
         });
     }
 
+    /* --- Logic --- */
+
     updateBpm(newBpm) {
-        // Clamp value
         if (newBpm < 150) newBpm = 150;
         if (newBpm > 200) newBpm = 200;
-
         this.bpm = newBpm;
 
-        // Update UI
-        this.els.currentBpm.textContent = this.bpm;
+        this.els.bpmDisplay.textContent = this.bpm;
         this.els.bpmSlider.value = this.bpm;
     }
 
     updateDuration(minutes) {
         this.durationMinutes = minutes;
+        this.initialDurationSecs = minutes * 60;
 
-        // Update Slider
-        this.els.durationSlider.value = minutes;
-        this.els.durationValue.textContent = minutes;
-
-        // Update Chips Active State
-        this.els.presetChips.forEach(chip => {
-            const chipVal = parseInt(chip.dataset.time, 10);
-            if (chipVal === minutes) {
-                chip.classList.add('active');
-            } else {
-                chip.classList.remove('active');
-            }
+        // Visual update for chips
+        this.els.chips.forEach(c => {
+            if (parseInt(c.dataset.time) === minutes) c.classList.add('active');
+            else c.classList.remove('active');
         });
+
+        // If not running, reset timer immediately
+        if (!this.isRunning) {
+            this.timeLeft = this.initialDurationSecs;
+            this.updateTimeDisplay();
+            this.setProgress(1); // Full ring
+        } else {
+            // If running, do we restart? Or just update reference? 
+            // Usually changing duration while running is tricky. 
+            // Let's restart timer logic is safest, or just update the max?
+            // For simplicity: if running, we stop and reset to new time to avoid confusion.
+            this.stopAction();
+        }
+    }
+
+    updateTimeDisplay() {
+        const m = Math.floor(this.timeLeft / 60);
+        const s = this.timeLeft % 60;
+        this.els.timeRemaining.textContent = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+
+    setProgress(percent) {
+        // percent 0.0 to 1.0
+        // strokeDashoffset: full length to 0
+        // If percent 1.0 (100%), offset is 0. 
+        // If percent 0.0 (0%), offset is perimeter.
+        const offset = this.ringPerimeter - (percent * this.ringPerimeter);
+        this.els.progressRect.style.strokeDashoffset = offset;
     }
 
     async toggleRun() {
         if (this.isRunning) {
-            this.stop();
+            this.pause();
         } else {
             await this.start();
         }
     }
 
     async start() {
-        this.els.silentAudio.play().catch(e => console.warn("Audio play failed", e));
+        // Audio Init
+        const silentAudio = document.getElementById('silent-audio');
+        silentAudio.play().catch(e => console.warn("Audio play failed", e));
 
         if (!this.audioContext) {
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -145,39 +163,60 @@ class NikoRunApp {
         await this.requestWakeLock();
 
         this.isRunning = true;
-        this.els.startBtn.textContent = "停止";
-        this.els.startBtn.classList.add('running');
-        this.els.settingsBtn.classList.add('hidden');
+        this.updatePlayPauseUI(true);
 
+        // If finished, reset
         if (this.timeLeft <= 0) {
-            this.timeLeft = this.durationMinutes * 60;
+            this.timeLeft = this.initialDurationSecs;
         }
 
+        // Metronome
         this.nextNoteTime = this.audioContext.currentTime;
         this.scheduler();
+
+        // Timer
         this.startTimer();
     }
 
-    stop() {
+    pause() {
         this.isRunning = false;
-        this.els.startBtn.textContent = "开始运动";
-        this.els.startBtn.classList.remove('running');
-        this.els.settingsBtn.classList.remove('hidden');
+        this.updatePlayPauseUI(false);
 
         if (this.timerInterval) {
             clearInterval(this.timerInterval);
             this.timerInterval = null;
         }
-
+        // Don't release wake lock on simple pause? Or yes? Better to keep if user takes a break.
+        // But spec says stop releases. Pause can keep it? Let's release to be safe on battery.
         if (this.wakeLock) {
-            this.wakeLock.release().then(() => {
-                this.wakeLock = null;
-            });
+            this.wakeLock.release().then(() => this.wakeLock = null);
         }
-        this.els.silentAudio.pause();
     }
 
-    /* --- Metronome Logic --- */
+    stopAction() {
+        this.pause();
+        // Reset Time
+        this.timeLeft = this.initialDurationSecs;
+        this.updateTimeDisplay();
+        this.setProgress(1);
+    }
+
+    updatePlayPauseUI(isRunning) {
+        // If running, show Pause icon & text
+        if (isRunning) {
+            this.els.iconPlay.classList.add('hidden');
+            this.els.iconPause.classList.remove('hidden');
+            this.els.startBtn.textContent = "暂停"; // Pause
+            this.els.startBtn.classList.add('active-state');
+        } else {
+            this.els.iconPlay.classList.remove('hidden');
+            this.els.iconPause.classList.add('hidden');
+            this.els.startBtn.textContent = "开始"; // Start
+            this.els.startBtn.classList.remove('active-state');
+        }
+    }
+
+    /* --- Metronome --- */
     scheduler() {
         if (!this.isRunning) return;
 
@@ -210,7 +249,7 @@ class NikoRunApp {
         osc.stop(time + 0.06);
     }
 
-    /* --- Timer Logic --- */
+    /* --- Timer Loop --- */
     startTimer() {
         clearInterval(this.timerInterval);
         let lastTick = Date.now();
@@ -222,11 +261,12 @@ class NikoRunApp {
             if (delta >= 1000) {
                 this.timeLeft--;
                 this.updateTimeDisplay();
-                lastTick = now;
 
-                if (this.timeLeft <= 10) {
-                    this.els.timeRemaining.classList.add('warning-state');
-                }
+                // Update Progress Ring
+                const percent = Math.max(0, this.timeLeft / this.initialDurationSecs);
+                this.setProgress(percent);
+
+                lastTick = now;
 
                 if (this.timeLeft <= 0) {
                     this.finishRun();
@@ -235,19 +275,9 @@ class NikoRunApp {
         }, 100);
     }
 
-    updateTimeDisplay() {
-        const m = Math.floor(this.timeLeft / 60);
-        const s = this.timeLeft % 60;
-        this.els.timeRemaining.textContent = `${m}:${s.toString().padStart(2, '0')}`;
-
-        if (this.timeLeft > 10) {
-            this.els.timeRemaining.classList.remove('warning-state');
-        }
-    }
-
     finishRun() {
-        this.stop();
-        this.els.timeRemaining.textContent = "完成";
+        this.pause();
+        this.els.timeRemaining.textContent = "DONE";
         this.playFinishSound();
     }
 

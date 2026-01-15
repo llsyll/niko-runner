@@ -1,10 +1,11 @@
 :root {
     --bg-color: #000000;
     --surface-color: #1c1c1e;
-    --primary-color: #0A84FF;
+    --accent-color: #befb46;
+    /* Lime Green from image */
+    --accent-dim: #3a4c1a;
     --text-primary: #FFFFFF;
     --text-secondary: #8E8E93;
-    --accent-color: #30D158;
     --danger-color: #FF453A;
     --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
 }
@@ -20,304 +21,234 @@
 
 body {
     font-family: var(--font-family);
-    background-color: var(--bg-color);
+    background-color: var(--surface-color);
+    /* Main bg is greyish per image */
     color: var(--text-primary);
     height: 100vh;
     overflow: hidden;
     display: flex;
-    flex-direction: column;
+    justify-content: center;
+    align-items: center;
 }
 
 .app-container {
-    flex: 1;
+    background-color: #000;
+    width: 100%;
+    height: 100%;
     display: flex;
     flex-direction: column;
-    padding: 20px;
-    padding-bottom: env(safe-area-inset-bottom, 20px);
-    max-width: 600px;
-    margin: 0 auto;
-    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    padding: 40px 20px;
+    max-width: 450px;
+    /* Constrain for mobile feeling on desktop */
+    border-radius: 40px;
+    /* Rounded corners for the "device" look if referenced on desktop, but full bleed on mobile */
 }
 
-header {
+/* On actual mobile, remove border radius/max-width restrictions if needed, 
+   but for now we keep it consistent with the "card" look or full screen */
+@media (max-width: 480px) {
+    .app-container {
+        border-radius: 0;
+        max-width: 100%;
+        padding: 60px 20px 40px;
+    }
+}
+
+/* Progress Ring Section */
+.progress-ring-container {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4/3;
+    max-height: 300px;
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
-    padding: 10px 0;
+    cursor: pointer;
+}
+
+.progress-ring {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+    /* Start from top */
+}
+
+.ring-bg {
+    fill: #111;
+    /* Inner dark distinct from bg */
+    stroke: #2C2C2E;
+    stroke-width: 0;
+}
+
+.ring-progress {
+    fill: none;
+    stroke: var(--accent-color);
+    stroke-width: 25;
+    /* Thick stroke */
+    stroke-linecap: round;
+    stroke-dasharray: 840;
+    /* Approximate perimeter */
+    stroke-dashoffset: 0;
+    /* Full ring */
+    transition: stroke-dashoffset 0.1s linear;
+}
+
+/* Play/Pause Icons centered */
+.play-icon-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    /* Let clicks pass to container */
+}
+
+.control-icon {
+    width: 60px;
     height: 60px;
 }
 
-.logo {
-    font-weight: 900;
-    font-size: 1.2rem;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    color: var(--text-secondary);
+.control-icon path,
+.control-icon rect {
+    fill: white;
 }
 
-.icon-btn {
-    font-size: 1.5rem;
-    cursor: pointer;
-    opacity: 0.8;
-    transition: opacity 0.2s;
-    padding: 10px;
+.hidden {
+    display: none;
 }
 
-.icon-btn:active {
-    opacity: 0.5;
-}
-
-main {
-    flex: 1;
+/* Timer Section */
+.timer-section {
+    text-align: center;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    gap: 10px;
     align-items: center;
-    gap: 40px;
-    padding-bottom: 40px;
-}
-
-/* Timer Display */
-.timer-display {
-    text-align: center;
-    transition: color 0.3s ease;
-}
-
-#time-remaining {
-    font-size: 5rem;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -2px;
-    display: block;
-    line-height: 1;
 }
 
 .timer-label {
+    color: var(--text-secondary);
     font-size: 1rem;
-    color: var(--text-secondary);
-    margin-top: 10px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    font-weight: 500;
 }
 
-/* Controls */
-.controls-container {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 30px;
-}
-
-/* New BPM Controls */
-.bpm-control-wrapper {
-    width: 100%;
-    background: var(--surface-color);
-    padding: 20px;
-    border-radius: 25px;
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-}
-
-.bpm-display-group {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-}
-
-.bpm-value {
-    text-align: center;
-}
-
-#current-bpm {
-    font-size: 2.5rem;
-    font-weight: 700;
-    line-height: 1;
-    display: block;
-}
-
-.bpm-value .label {
-    font-size: 0.8rem;
-    color: var(--text-secondary);
+.main-timer {
+    font-size: 5.5rem;
     font-weight: 600;
+    letter-spacing: -2px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
 }
 
-.bpm-btn {
-    background: rgba(255, 255, 255, 0.08);
-    /* Distinct background */
-    border: none;
-    color: var(--text-primary);
-    font-size: 1.5rem;
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
+.stop-btn {
+    /* Legacy override - will remove later or keep for reference */
+    display: none;
+}
+
+.controls-row {
     display: flex;
-    align-items: center;
-    justify-content: center;
+    gap: 20px;
+    margin-top: 15px;
+}
+
+.control-btn {
+    border: none;
+    padding: 15px 40px;
+    font-size: 1.2rem;
+    font-weight: 600;
+    border-radius: 30px;
     cursor: pointer;
-    transition: background-color 0.2s;
+    text-transform: uppercase;
+    transition: opacity 0.2s, transform 0.1s;
+    min-width: 120px;
 }
 
-.bpm-btn:active {
-    background-color: rgba(255, 255, 255, 0.2);
+.control-btn:active {
+    transform: scale(0.98);
+    opacity: 0.8;
 }
 
-/* Slider Styling */
-.slider {
-    -webkit-appearance: none;
-    width: 100%;
-    height: 6px;
-    background: #333;
-    border-radius: 3px;
-    outline: none;
-    margin: 10px 0;
-}
-
-.slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 24px;
-    height: 24px;
-    background: var(--primary-color);
-    border-radius: 50%;
-    cursor: pointer;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-    border: 2px solid #fff;
-}
-
-.slider::-moz-range-thumb {
-    width: 24px;
-    height: 24px;
-    background: var(--primary-color);
-    border-radius: 50%;
-    cursor: pointer;
-    border: 2px solid #fff;
-}
-
-/* Main Button */
-.primary-btn {
+.start-btn {
     background-color: var(--accent-color);
     color: #000;
-    border: none;
-    font-size: 1.5rem;
-    font-weight: 700;
-    padding: 20px 0;
-    width: 100%;
-    border-radius: 20px;
-    cursor: pointer;
-    transition: transform 0.1s, opacity 0.2s, background-color 0.3s;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    box-shadow: 0 4px 20px rgba(48, 209, 88, 0.3);
+    /* Contrast on lime green */
 }
 
-.primary-btn:active {
-    transform: scale(0.98);
-}
-
-.primary-btn.running {
-    background-color: var(--danger-color);
-    color: white;
-    box-shadow: 0 4px 20px rgba(255, 69, 58, 0.3);
-}
-
-/* Modal */
-.modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.8);
-    backdrop-filter: blur(10px);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-    opacity: 1;
-    transition: opacity 0.3s;
-}
-
-.modal.hidden {
-    opacity: 0;
-    pointer-events: none;
-}
-
-.modal-content {
-    background: var(--surface-color);
-    padding: 30px;
-    border-radius: 25px;
-    width: 90%;
-    max-width: 380px;
-    text-align: center;
-}
-
-.modal-content h2 {
-    margin-bottom: 25px;
-    font-size: 1.3rem;
-}
-
-/* Duration Control Styles */
-.setting-item {
-    margin-bottom: 30px;
-}
-
-.setting-item label {
+.stop-btn {
+    background-color: #2C2C2E;
+    color: var(--text-primary);
     display: block;
-    margin-bottom: 15px;
+    /* Restore display */
+}
+
+/* BPM Section */
+.bpm-section {
+    width: 100%;
+    padding: 0 20px;
+}
+
+.bpm-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.bpm-readout {
     color: var(--text-secondary);
     font-size: 0.9rem;
 }
 
-.preset-chips {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
-    margin-bottom: 20px;
-}
-
-.chip {
-    background: rgba(255, 255, 255, 0.08);
-    border: none;
-    color: var(--text-primary);
-    padding: 10px 0;
-    border-radius: 10px;
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-.chip.active {
-    background: var(--primary-color);
+#current-bpm {
     color: white;
-}
-
-.slider-container {
-    font-size: 1.2rem;
     font-weight: 700;
 }
 
-.slider-container input {
-    margin-top: 15px;
+/* Slider Style Update */
+.slider {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: #333;
+    border-radius: 2px;
+    outline: none;
 }
 
-.secondary-btn {
-    background: transparent;
-    border: 1px solid var(--text-secondary);
-    color: var(--text-primary);
-    padding: 12px 40px;
-    border-radius: 20px;
-    font-size: 1rem;
+.slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    background: #555;
+    border-radius: 50%;
     cursor: pointer;
 }
 
-/* Utilities */
-.hidden {
-    display: none !important;
+/* Quick Actions */
+.quick-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    width: 100%;
 }
 
-.warning-state {
-    color: var(--danger-color) !important;
+.chip {
+    background: #2C2C2E;
+    border: none;
+    color: var(--text-secondary);
+    padding: 15px 25px;
+    border-radius: 20px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    flex: 1;
+    max-width: 100px;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.chip.active {
+    background-color: var(--accent-dim);
+    color: var(--accent-color);
+    border: 1px solid var(--accent-color);
 }
