@@ -29,6 +29,8 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
+    /* Ensure background is black to blend with notch if covering */
+    background-color: #000;
 }
 
 .app-container {
@@ -39,11 +41,16 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: space-between;
-    padding: 40px 20px;
+
+    /* Increased top padding + Safe Area */
+    padding-top: max(60px, env(safe-area-inset-top));
+    padding-bottom: max(30px, env(safe-area-inset-bottom));
+    padding-left: 24px;
+    padding-right: 24px;
+
     max-width: 450px;
-    /* Constrain for mobile feeling on desktop */
+    /* "收敛" - Constrain content width slightly even on mobile to avoid touching edges too much */
     border-radius: 40px;
-    /* Rounded corners for the "device" look if referenced on desktop, but full bleed on mobile */
 }
 
 /* On actual mobile, remove border radius/max-width restrictions if needed, 
@@ -225,25 +232,45 @@ body {
     cursor: pointer;
 }
 
-/* Quick Actions */
+/* Quick Actions - Horizontal Scroll */
 .quick-actions {
     display: flex;
-    gap: 15px;
-    justify-content: center;
-    width: 100%;
+    gap: 12px;
+    justify-content: flex-start;
+    /* Start for scroll */
+    width: 100vw;
+    /* Full viewport width to allow edge-to-edge scroll interaction */
+    overflow-x: auto;
+    padding: 10px 24px;
+    /* Align with app padding */
+    margin-left: -24px;
+    /* Counteract parent padding to stretch full width */
+    margin-right: -24px;
+
+    /* Hide scrollbar */
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
+}
+
+.quick-actions::-webkit-scrollbar {
+    display: none;
 }
 
 .chip {
     background: #2C2C2E;
     border: none;
     color: var(--text-secondary);
-    padding: 15px 25px;
-    border-radius: 20px;
-    font-size: 1rem;
+    padding: 12px 24px;
+    border-radius: 25px;
+    font-size: 0.95rem;
     font-weight: 600;
     cursor: pointer;
-    flex: 1;
-    max-width: 100px;
+    flex: 0 0 auto;
+    /* Don't shrink */
+    min-width: 80px;
+    text-align: center;
     transition: background-color 0.2s, color 0.2s;
 }
 
