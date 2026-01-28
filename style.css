@@ -378,11 +378,35 @@ body {
     justify-content: center;
 }
 
+.progress-ring {
+    width: auto;
+    height: 100%;
+    pointer-events: none;
+    /* Pass clicks through */
+}
+
+/* ... */
+
 .progress-line {
     width: 100%;
     max-width: 240px;
-    /* Match ring width approx */
-    overflow: visible;
+    height: 20px;
+    /* Explicit height */
+    pointer-events: none;
+    /* Pass clicks through */
+}
+
+/* ... */
+
+.control-btn,
+.chip,
+.tab-btn,
+.chip-sm,
+.slider {
+    pointer-events: auto;
+    position: relative;
+    /* Ensure z-index works if needed */
+    z-index: 5;
 }
 
 .line-bg {
