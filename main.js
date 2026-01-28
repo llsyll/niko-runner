@@ -268,7 +268,10 @@ class IntervalController {
         this.phase = 'ready'; // ready, work, rest, done
         this.currentSet = 1;
         this.timeLeft = this.workTime;
-        this.totalTimeLeft = 0; // Total duration remaining
+
+        // Total Time Calculation
+        this.totalDuration = 0;
+        this.elapsedTime = 0;
 
         // Metronome
         this.nextNoteTime = 0.0;
@@ -280,8 +283,8 @@ class IntervalController {
             phaseLabel: document.getElementById('int-phase-label'),
             currentSet: document.getElementById('int-current-set'),
             totalSets: document.getElementById('int-total-sets'),
-            totalProgressFill: document.getElementById('total-progress-fill'),
             timer: document.getElementById('int-timer-display'),
+            totalProgressBar: document.getElementById('int-total-progress'),
             startBtn: document.getElementById('int-start-btn'),
             stopBtn: document.getElementById('int-stop-btn'),
 
@@ -291,8 +294,9 @@ class IntervalController {
         };
 
         this.initEvents();
-        this.calculateTotalTime();
+        this.updateTotalDuration();
         this.updateUI();
+        this.updateTotalProgress();
     }
 
     initEvents() {
@@ -302,7 +306,10 @@ class IntervalController {
                 this.workTime = parseInt(btn.dataset.val);
                 this.updateChips(this.els.chipsWork, this.workTime);
                 if (!this.isRunning) this.reset();
-                else this.calculateTotalTime(); // dynamic update if running
+                else {
+                    this.updateTotalDuration();
+                    this.updateTotalProgress();
+                }
             });
         });
 
@@ -312,7 +319,10 @@ class IntervalController {
                 this.restTime = parseInt(btn.dataset.val);
                 this.updateChips(this.els.chipsRest, this.restTime);
                 if (!this.isRunning) this.reset();
-                else this.calculateTotalTime();
+                else {
+                    this.updateTotalDuration();
+                    this.updateTotalProgress();
+                }
             });
         });
 
@@ -322,7 +332,10 @@ class IntervalController {
                 this.totalSets = parseInt(btn.dataset.val);
                 this.updateChips(this.els.chipsSets, this.totalSets);
                 if (!this.isRunning) this.reset();
-                else this.calculateTotalTime();
+                else {
+                    this.updateTotalDuration();
+                    this.updateTotalProgress();
+                }
             });
         });
 
@@ -334,44 +347,24 @@ class IntervalController {
     updateChips(list, val) {
         list.forEach(c => {
             if (parseInt(c.dataset.val) === val) c.classList.add('active');
-        }
+            else c.classList.remove('active');
+        });
+    }
 
-    calculateTotalTime() {
-            // Full Duration for progress calc
-            const fullDuration = this.totalSets * (this.workTime + this.restTime);
-            this.initialTotalDuration = fullDuration;
-
-            // Remaining calc
-            let remaining = 0;
-
-            if(this.phase === 'ready') {
-            remaining = fullDuration;
-        } else if (this.phase === 'done') {
-            remaining = 0;
-        } else {
-            // Current set remainder
-            remaining += this.timeLeft;
-            // Add Rest if currently Working
-            if (this.phase === 'work') {
-                remaining += this.restTime;
-            }
-
-            // Pending sets (excluding current)
-            const pendingSets = this.totalSets - this.currentSet;
-            if (pendingSets > 0) {
-                remaining += pendingSets * (this.workTime + this.restTime);
-            }
-        }
-
-        this.totalTimeLeft = remaining;
+    updateTotalDuration() {
+        // Total = Sets * (Work + Rest) - Last Rest (optional? usually kept for simplicity)
+        this.totalDuration = this.totalSets * (this.workTime + this.restTime);
+        // Maybe minus last rest? Let's keep it simple: full cycles
     }
 
     reset() {
         this.phase = 'ready';
         this.currentSet = 1;
         this.timeLeft = this.workTime;
-        this.calculateTotalTime();
+        this.updateTotalDuration();
+        this.elapsedTime = 0;
         this.updateUI();
+        this.updateTotalProgress();
     }
 
     async toggle() {
@@ -393,12 +386,14 @@ class IntervalController {
             this.phase = 'work';
             this.currentSet = 1;
             this.timeLeft = this.workTime;
-            this.calculateTotalTime();
+            this.updateTotalDuration(); // Recalc in case settings changed
+            this.elapsedTime = 0;
+
+            // Sync Next Note Time for Metronome
+            this.nextNoteTime = this.app.audio.getCurrentTime();
+
             this.app.audio.playWorkBeep();
         }
-
-        // Sync Metronome
-        this.nextNoteTime = this.app.audio.getCurrentTime();
 
         this.updateUI();
         this.app.startWorker();
@@ -421,14 +416,6 @@ class IntervalController {
         this.els.totalSets.textContent = this.totalSets;
         this.els.timer.textContent = this.formatTime(this.timeLeft);
 
-
-
-        // Total Progress Bar
-        const percentLeft = this.initialTotalDuration > 0 ? (this.totalTimeLeft / this.initialTotalDuration) : 0;
-        // SVG width is 200
-        const fillWidth = 200 * (1 - percentLeft); // Grow from 0 to 200
-        this.els.totalProgressFill.setAttribute('width', Math.min(200, Math.max(0, fillWidth)));
-
         if (this.phase === 'ready') {
             this.els.phaseLabel.textContent = "READY";
             this.els.phaseLabel.className = "status-label";
@@ -445,20 +432,29 @@ class IntervalController {
     }
 
     formatTime(sec) {
-        if (sec < 0) sec = 0; // Prevent -1 display
+        if (sec < 0) sec = 0; // Fix -1:-1 bug
         const m = Math.floor(sec / 60);
         const s = sec % 60;
         return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     }
 
+    updateTotalProgress() {
+        if (this.totalDuration <= 0) {
+            this.els.totalProgressBar.style.width = '0%';
+            return;
+        }
+        const pct = Math.min(100, (this.elapsedTime / this.totalDuration) * 100);
+        this.els.totalProgressBar.style.width = `${pct}%`;
+    }
+
     onTick(now, delta) {
         if (!this.isRunning) return;
 
-        // Metronome while Working
+        // Metronome during Work Phase
         if (this.phase === 'work') {
-            while (this.nextNoteTime < this.app.audio.getCurrentTime() + this.scheduleAheadTime) {
+            while (this.nextNoteTime < this.app.audio.getCurrentTime() + 0.1) {
                 this.app.audio.scheduleTick(this.nextNoteTime);
-                this.nextNoteTime += (60.0 / this.bpm);
+                this.nextNoteTime += (60.0 / 180); // 180 BPM
             }
         } else {
             // Keep note time synced so it doesn't burst on next start
@@ -467,10 +463,11 @@ class IntervalController {
 
         if (delta >= 1000) {
             this.timeLeft--;
-            this.totalTimeLeft--;
+            this.elapsedTime++;
 
-            if (this.timeLeft <= 0) {
-                // Must handle phase switch immediately to avoid -1
+            this.updateTotalProgress();
+
+            if (this.timeLeft < 0) {
                 this.nextPhase();
             } else {
                 this.updateUI();

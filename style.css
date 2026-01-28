@@ -369,55 +369,6 @@ body {
     font-size: 1rem;
 }
 
-/* Total Progress Bar */
-.total-progress-container {
-    width: 100%;
-    margin-top: 10px;
-    padding: 0 10px;
-    display: flex;
-    justify-content: center;
-}
-
-.progress-ring {
-    width: auto;
-    height: 100%;
-    pointer-events: none;
-    /* Pass clicks through */
-}
-
-/* ... */
-
-.progress-line {
-    width: 100%;
-    max-width: 240px;
-    height: 20px;
-    /* Explicit height */
-    pointer-events: none;
-    /* Pass clicks through */
-}
-
-/* ... */
-
-.control-btn,
-.chip,
-.tab-btn,
-.chip-sm,
-.slider {
-    pointer-events: auto;
-    position: relative;
-    /* Ensure z-index works if needed */
-    z-index: 5;
-}
-
-.line-bg {
-    fill: #2C2C2E;
-}
-
-.line-fill {
-    fill: var(--accent-color);
-    transition: width 0.5s linear;
-}
-
 /* Interval Settings */
 .interval-settings {
     width: 100%;
@@ -509,4 +460,22 @@ body {
     font-size: 1.1rem;
     min-width: 30px;
     text-align: center;
+}
+
+/* Total Progress Bar (Interval) */
+.total-progress-container {
+    width: 200px;
+    height: 8px;
+    background-color: #2C2C2E;
+    border-radius: 4px;
+    margin-top: 10px;
+    overflow: hidden;
+}
+
+.total-progress-bar {
+    width: 0%;
+    height: 100%;
+    background-color: var(--accent-color);
+    border-radius: 4px;
+    transition: width 1s linear;
 }
