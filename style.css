@@ -79,6 +79,18 @@ body {
     margin-top: 10px;
 }
 
+.ring-bg {
+    fill: none;
+    stroke: #2C2C2E;
+    stroke-width: 20;
+    /* Thick stroke */
+    stroke-linecap: round;
+    /* dasharray will be set by JS */
+    stroke-dashoffset: 0;
+    /* Full ring */
+    transition: stroke-dashoffset 0.1s linear;
+}
+
 .ring-progress {
     fill: none;
     stroke: var(--accent-color);

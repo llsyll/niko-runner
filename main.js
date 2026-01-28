@@ -352,9 +352,10 @@ class IntervalController {
     }
 
     updateTotalDuration() {
-        // Total = Sets * (Work + Rest) - Last Rest (optional? usually kept for simplicity)
-        this.totalDuration = this.totalSets * (this.workTime + this.restTime);
-        // Maybe minus last rest? Let's keep it simple: full cycles
+        // Total = Sets * Work + (Sets - 1) * Rest
+        // Standard Tabata: No rest after last set
+        if (this.totalSets <= 0) this.totalDuration = 0;
+        else this.totalDuration = (this.totalSets * this.workTime) + ((this.totalSets - 1) * this.restTime);
     }
 
     reset() {
@@ -451,16 +452,7 @@ class IntervalController {
     onTick(now, delta) {
         if (!this.isRunning) return;
 
-        // Metronome during Work Phase
-        if (this.phase === 'work') {
-            while (this.nextNoteTime < this.app.audio.getCurrentTime() + 0.1) {
-                this.app.audio.scheduleTick(this.nextNoteTime);
-                this.nextNoteTime += (60.0 / 180); // 180 BPM
-            }
-        } else {
-            // Keep note time synced so it doesn't burst on next start
-            this.nextNoteTime = this.app.audio.getCurrentTime();
-        }
+        // Metronome Removed per user request
 
         if (delta >= 1000) {
             this.timeLeft--;
@@ -479,34 +471,35 @@ class IntervalController {
     }
 
     nextPhase() {
-        // Force 0 for visual cleaniness before switch if needed, 
-        // but typically we switch immediately at 0
         if (this.phase === 'work') {
-            // Work done -> Rest
-            this.app.audio.playRestBeep();
-            this.phase = 'rest';
-            this.timeLeft = this.restTime;
-        } else {
-            // Rest done -> Next Set or Done
+            // Work done
             if (this.currentSet >= this.totalSets) {
-                // Done
+                // All Sets Done -> FINISH (Skip last rest)
                 this.app.audio.playFinish();
                 this.phase = 'done';
                 this.timeLeft = 0;
-                this.totalTimeLeft = 0;
                 this.updateUI();
                 this.pause();
-                return; // Stop here
+                // Ensure progress is full
+                this.elapsedTime = this.totalDuration;
+                this.updateTotalProgress();
+                return;
             } else {
-                // Next Set
-                this.currentSet++;
-                this.app.audio.playWorkBeep();
-                this.phase = 'work';
-                this.timeLeft = this.workTime;
+                // Rest Time
+                this.app.audio.playRestBeep();
+                this.phase = 'rest';
+                this.timeLeft = this.restTime;
             }
+        } else {
+            // Rest done -> Next Set
+            this.currentSet++;
+            this.app.audio.playWorkBeep();
+            this.phase = 'work';
+            this.timeLeft = this.workTime;
         }
-        // Recalculate Total Time exactly to avoid drift
-        this.calculateTotalTime();
+
+        // Recalculate or just Update UI
+        this.updateTotalDuration();
         this.updateUI();
     }
 }
