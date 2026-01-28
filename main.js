@@ -47,9 +47,14 @@ class AudioController {
         this.playTone(880, 0.1, 'square');
     }
 
-    // Interval: Rest Start (Low Beep, distinct)
+    // Interval: Rest Start (Double Low Beep)
     playRestBeep() {
-        this.playTone(330, 0.2, 'triangle');
+        // First beep
+        this.playTone(330, 0.15, 'triangle');
+        // Second beep slightly later
+        setTimeout(() => {
+            this.playTone(330, 0.4, 'triangle');
+        }, 200);
     }
 
     // Finish Sound
@@ -275,10 +280,7 @@ class IntervalController {
 
             chipsWork: document.querySelectorAll('#chips-work .chip-sm'),
             chipsRest: document.querySelectorAll('#chips-rest .chip-sm'),
-
-            setsMinus: document.getElementById('sets-minus'),
-            setsPlus: document.getElementById('sets-plus'),
-            setsDisplay: document.getElementById('sets-display'),
+            chipsSets: document.querySelectorAll('#chips-sets .chip-sm'),
         };
 
         this.initEvents();
@@ -303,16 +305,13 @@ class IntervalController {
             });
         });
 
-        // Settings: Sets
-        this.els.setsMinus.addEventListener('click', () => {
-            if (this.totalSets > 1) {
-                this.totalSets--;
+        // Settings: Sets (Chips)
+        this.els.chipsSets.forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.totalSets = parseInt(btn.dataset.val);
+                this.updateChips(this.els.chipsSets, this.totalSets);
                 this.updateSetsUI();
-            }
-        });
-        this.els.setsPlus.addEventListener('click', () => {
-            this.totalSets++;
-            this.updateSetsUI();
+            });
         });
 
         // Controls
@@ -328,7 +327,6 @@ class IntervalController {
     }
 
     updateSetsUI() {
-        this.els.setsDisplay.textContent = this.totalSets;
         this.els.totalSets.textContent = this.totalSets;
     }
 

@@ -310,6 +310,9 @@ body {
     padding: 4px;
     border-radius: 20px;
     margin-bottom: 20px;
+    position: relative;
+    z-index: 10;
+    flex-shrink: 0;
 }
 
 .tab-btn {
