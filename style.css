@@ -283,3 +283,163 @@ body {
     color: var(--accent-color);
     border: 1px solid var(--accent-color);
 }
+
+/* Mode Switcher */
+.mode-switcher {
+    display: flex;
+    background-color: #2C2C2E;
+    padding: 4px;
+    border-radius: 20px;
+    margin-bottom: 20px;
+}
+
+.tab-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 8px 24px;
+    border-radius: 16px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.tab-btn.active {
+    background-color: #636366;
+    color: white;
+}
+
+/* Mode Views */
+.mode-view {
+    width: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    /* Match parent distribution */
+}
+
+/* Interval Timer Specifics */
+.interval-status {
+    text-align: center;
+    margin-bottom: 0px;
+    margin-top: 10px;
+}
+
+.status-label {
+    font-size: 2rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    letter-spacing: 2px;
+}
+
+.status-label.work {
+    color: var(--accent-color);
+}
+
+.status-label.rest {
+    color: var(--danger-color);
+    /* Orange/Red for Rest */
+}
+
+.set-counter {
+    color: var(--text-secondary);
+    margin-top: 5px;
+    font-size: 1rem;
+}
+
+/* Interval Settings */
+.interval-settings {
+    width: 100%;
+    background-color: #1C1C1E;
+    border-radius: 20px;
+    padding: 20px;
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.setting-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.setting-row label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+    margin-left: 4px;
+}
+
+.setting-chips {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    /* For scrollbar space if needed */
+    scrollbar-width: none;
+}
+
+.setting-chips::-webkit-scrollbar {
+    display: none;
+}
+
+.chip-sm {
+    background: #2C2C2E;
+    border: 1px solid #3A3A3C;
+    color: var(--text-secondary);
+    padding: 8px 16px;
+    border-radius: 15px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    flex: 0 0 auto;
+    transition: all 0.2s;
+}
+
+.chip-sm.active {
+    background-color: #3A3A3C;
+    color: white;
+    border-color: white;
+}
+
+/* Stepper */
+.stepper {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    background: #2C2C2E;
+    border-radius: 15px;
+    padding: 5px;
+    width: fit-content;
+}
+
+.stepper-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    border: none;
+    background: #3A3A3C;
+    color: white;
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.stepper-btn:active {
+    background: #48484A;
+}
+
+#sets-display {
+    font-weight: 600;
+    font-size: 1.1rem;
+    min-width: 30px;
+    text-align: center;
+}

@@ -1,171 +1,345 @@
 /**
- * Niko Niko Running - Main Application Logic
+ * Niko Runner & Interval Timer App
  */
 
-class NikoRunApp {
+// --- Audio Controller ---
+class AudioController {
     constructor() {
-        // State
+        this.ctx = null;
+    }
+
+    async init() {
+        if (!this.ctx) {
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (this.ctx.state === 'suspended') {
+            await this.ctx.resume();
+        }
+        // Silent loop for iOS background
+        const silent = document.getElementById('silent-audio');
+        if (silent) silent.play().catch(e => console.warn("Audio play failed", e));
+    }
+
+    getCurrentTime() {
+        return this.ctx ? this.ctx.currentTime : 0;
+    }
+
+    // Metronome Tick
+    scheduleTick(time) {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.type = 'sine';
+        osc.frequency.value = 880;
+
+        gain.gain.setValueAtTime(1, time);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+
+        osc.start(time);
+        osc.stop(time + 0.06);
+    }
+
+    // Interval: Work Start (High Beep)
+    playWorkBeep() {
+        this.playTone(880, 0.1, 'square');
+    }
+
+    // Interval: Rest Start (Low Beep)
+    playRestBeep() {
+        this.playTone(440, 0.1, 'sine');
+    }
+
+    // Finish Sound
+    playFinish() {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(523.25, this.ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(1046.5, this.ctx.currentTime + 1);
+
+        gain.gain.setValueAtTime(1, this.ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 1);
+
+        osc.start();
+        osc.stop(this.ctx.currentTime + 1);
+    }
+
+    playTone(freq, duration, type = 'sine') {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.type = type;
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+
+        osc.start();
+        osc.stop(this.ctx.currentTime + duration);
+    }
+}
+
+// --- Niko Mode Controller ---
+class NikoController {
+    constructor(app) {
+        this.app = app;
         this.isRunning = false;
         this.bpm = 180;
-        this.durationMinutes = 15; // Defaut to 15 based on first chip
+        this.durationMinutes = 15;
         this.initialDurationSecs = this.durationMinutes * 60;
         this.timeLeft = this.initialDurationSecs;
 
-        // Audio & System
-        this.wakeLock = null;
-        this.audioContext = null;
+        // Metronome Scheduler
         this.nextNoteTime = 0.0;
-        this.timerInterval = null;
         this.scheduleAheadTime = 0.1;
-        this.lookahead = 25.0;
-        this.lastTimerTick = 0;
 
-        // UI References
+        // UI Refs
         this.els = {
-            timeRemaining: document.getElementById('time-remaining'),
-            playPauseArea: document.getElementById('play-pause-area'),
+            view: document.getElementById('view-niko'),
+            time: document.getElementById('time-remaining'),
+            playArea: document.getElementById('play-pause-area'),
             iconPlay: document.getElementById('icon-play'),
             iconPause: document.getElementById('icon-pause'),
             progressRect: document.getElementById('progress-rect'),
-
-            stopBtn: document.getElementById('stop-btn'),
             startBtn: document.getElementById('start-btn'),
-
-            bpmDisplay: document.getElementById('current-bpm'),
+            stopBtn: document.getElementById('stop-btn'),
             bpmSlider: document.getElementById('bpm-slider'),
-
-            chips: document.querySelectorAll('.chip'),
+            bpmDisplay: document.getElementById('current-bpm'),
+            chips: document.querySelectorAll('#view-niko .chip'),
         };
 
-        // Ring Calculation
-        // Rect: width 280, height 180, rx 40
-        // Perimeter ~= 2*(w-2r) + 2*(h-2r) + 2*PI*r
+        // Ring Calc
         const w = 280, h = 180, r = 40;
         this.ringPerimeter = 2 * (w - 2 * r) + 2 * (h - 2 * r) + 2 * Math.PI * r;
-
-        // Set initial stroke dasharray
         this.els.progressRect.style.strokeDasharray = `${this.ringPerimeter} ${this.ringPerimeter}`;
         this.els.progressRect.style.strokeDashoffset = 0;
 
-        this.init();
+        this.initEvents();
     }
 
-    init() {
-        this.setupWorker();
-        this.addEventListeners();
-        this.updateTimeDisplay();
-        this.updateBpm(this.bpm);
-        this.updateDuration(15);
-    }
+    initEvents() {
+        this.els.playArea.addEventListener('click', () => this.toggle());
+        this.els.startBtn.addEventListener('click', () => this.toggle());
+        this.els.stopBtn.addEventListener('click', () => this.stop());
 
-    setupWorker() {
-        // Create worker instance
-        this.timerWorker = new Worker("tm-worker.js");
-
-        this.timerWorker.onmessage = (e) => {
-            if (e.data === "tick") {
-                this.scheduler();
-                this.handleTimerTick();
-            }
-        };
-
-        this.timerWorker.postMessage({ interval: this.lookahead });
-    }
-
-    addEventListeners() {
-        // Play/Pause Toggle on Ring Click
-        this.els.playPauseArea.addEventListener('click', () => this.toggleRun());
-
-        // Start Button Click
-        this.els.startBtn.addEventListener('click', () => this.toggleRun());
-
-        // Stop Button
-        this.els.stopBtn.addEventListener('click', () => this.stopAction());
-
-        // BPM Slider
         this.els.bpmSlider.addEventListener('input', (e) => {
-            this.updateBpm(parseInt(e.target.value, 10));
+            this.bpm = parseInt(e.target.value, 10);
+            this.els.bpmDisplay.textContent = this.bpm;
         });
 
-        // Duration Chips
         this.els.chips.forEach(chip => {
             chip.addEventListener('click', () => {
-                // Determine value
-                if (chip.dataset.time) {
-                    const val = parseInt(chip.dataset.time, 10);
-                    this.updateDuration(val);
-                }
+                const val = parseInt(chip.dataset.time, 10);
+                this.updateDuration(val);
             });
         });
-
-        // Visibility Change for Wake Lock
-        document.addEventListener('visibilitychange', async () => {
-            if (this.wakeLock !== null && document.visibilityState === 'visible') {
-                await this.requestWakeLock();
-            }
-        });
     }
 
-    updateBpm(newBpm) {
-        if (newBpm < 150) newBpm = 150;
-        if (newBpm > 200) newBpm = 200;
-        this.bpm = newBpm;
+    updateDuration(mins) {
+        this.durationMinutes = mins;
+        this.initialDurationSecs = mins * 60;
 
-        this.els.bpmDisplay.textContent = this.bpm;
-        this.els.bpmSlider.value = this.bpm;
-    }
-
-    updateDuration(minutes) {
-        this.durationMinutes = minutes;
-        this.initialDurationSecs = minutes * 60;
-
-        // Visual update for chips
+        // Update Chips UI
         this.els.chips.forEach(c => {
-            if (parseInt(c.dataset.time) === minutes) c.classList.add('active');
+            if (parseInt(c.dataset.time) === mins) c.classList.add('active');
             else c.classList.remove('active');
         });
 
-        // If not running, reset timer immediately
-        if (!this.isRunning) {
-            this.timeLeft = this.initialDurationSecs;
-            this.updateTimeDisplay();
-            this.setProgress(1); // Full ring
-        } else {
-            // If running, stop and reset to new time to avoid confusion.
-            this.stopAction();
-        }
+        if (this.isRunning) this.stop();
+        this.reset();
     }
 
-    updateTimeDisplay() {
-        if (this.timeLeft < 0) this.timeLeft = 0;
-        const m = Math.floor(this.timeLeft / 60);
-        const s = this.timeLeft % 60;
-        this.els.timeRemaining.textContent = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    reset() {
+        this.timeLeft = this.initialDurationSecs;
+        this.updateTimeStr();
+        this.setProgress(1);
     }
 
-    setProgress(percent) {
-        // percent 0.0 to 1.0
-        // strokeDashoffset: full length to 0
-        const offset = this.ringPerimeter - (percent * this.ringPerimeter);
-        this.els.progressRect.style.strokeDashoffset = offset;
+    async toggle() {
+        if (this.isRunning) this.pause();
+        else await this.start();
     }
 
-    updatePlayPauseUI(isRunning) {
-        // If running, show Pause icon & text
-        if (isRunning) {
+    async start() {
+        await this.app.requestAudio();
+        await this.app.requestWakeLock();
+
+        this.isRunning = true;
+        this.updateUIState();
+
+        if (this.timeLeft <= 0) this.reset();
+
+        this.nextNoteTime = this.app.audio.getCurrentTime();
+        this.app.startWorker();
+    }
+
+    pause() {
+        this.isRunning = false;
+        this.updateUIState();
+        this.app.stopWorker();
+        this.app.releaseWakeLock();
+    }
+
+    stop() {
+        this.pause();
+        this.reset();
+    }
+
+    updateUIState() {
+        if (this.isRunning) {
             this.els.iconPlay.classList.add('hidden');
             this.els.iconPause.classList.remove('hidden');
-            this.els.startBtn.textContent = "暂停"; // Pause
+            this.els.startBtn.textContent = "暂停";
             this.els.startBtn.classList.add('active-state');
         } else {
             this.els.iconPlay.classList.remove('hidden');
             this.els.iconPause.classList.add('hidden');
-            this.els.startBtn.textContent = "开始"; // Start
+            this.els.startBtn.textContent = "开始";
             this.els.startBtn.classList.remove('active-state');
         }
     }
 
-    async toggleRun() {
+    updateTimeStr() {
+        if (this.timeLeft < 0) this.timeLeft = 0;
+        const m = Math.floor(this.timeLeft / 60);
+        const s = this.timeLeft % 60;
+        this.els.time.textContent = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+
+    setProgress(percent) {
+        const offset = this.ringPerimeter - (percent * this.ringPerimeter);
+        this.els.progressRect.style.strokeDashoffset = offset;
+    }
+
+    // Called by Main App on specific interval (e.g. 25ms)
+    onTick(now, delta) {
+        if (!this.isRunning) return;
+
+        // Metronome Scheduler
+        while (this.nextNoteTime < this.app.audio.getCurrentTime() + this.scheduleAheadTime) {
+            this.app.audio.scheduleTick(this.nextNoteTime);
+            this.nextNoteTime += (60.0 / this.bpm);
+        }
+
+        // Timer Logic (1 sec)
+        if (delta >= 1000) {
+            this.timeLeft--;
+            this.updateTimeStr();
+            this.setProgress(Math.max(0, this.timeLeft / this.initialDurationSecs));
+
+            if (this.timeLeft <= 0) {
+                this.pause();
+                this.els.time.textContent = "DONE";
+                this.app.audio.playFinish();
+            }
+            return true; // returns true if 1 second tick happened
+        }
+        return false;
+    }
+}
+
+// --- Interval Mode Controller ---
+class IntervalController {
+    constructor(app) {
+        this.app = app;
+        this.isRunning = false;
+
+        // Settings
+        this.workTime = 20;
+        this.restTime = 5;
+        this.totalSets = 10;
+
+        // State
+        this.phase = 'ready'; // ready, work, rest, done
+        this.currentSet = 1;
+        this.timeLeft = this.workTime;
+
+        // UI
+        this.els = {
+            view: document.getElementById('view-interval'),
+            phaseLabel: document.getElementById('int-phase-label'),
+            currentSet: document.getElementById('int-current-set'),
+            totalSets: document.getElementById('int-total-sets'),
+            timer: document.getElementById('int-timer-display'),
+            startBtn: document.getElementById('int-start-btn'),
+            stopBtn: document.getElementById('int-stop-btn'),
+
+            chipsWork: document.querySelectorAll('#chips-work .chip-sm'),
+            chipsRest: document.querySelectorAll('#chips-rest .chip-sm'),
+
+            setsMinus: document.getElementById('sets-minus'),
+            setsPlus: document.getElementById('sets-plus'),
+            setsDisplay: document.getElementById('sets-display'),
+        };
+
+        this.initEvents();
+    }
+
+    initEvents() {
+        // Settings: Work
+        this.els.chipsWork.forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.workTime = parseInt(btn.dataset.val);
+                this.updateChips(this.els.chipsWork, this.workTime);
+                if (!this.isRunning) this.reset();
+            });
+        });
+
+        // Settings: Rest
+        this.els.chipsRest.forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.restTime = parseInt(btn.dataset.val);
+                this.updateChips(this.els.chipsRest, this.restTime);
+                if (!this.isRunning) this.reset();
+            });
+        });
+
+        // Settings: Sets
+        this.els.setsMinus.addEventListener('click', () => {
+            if (this.totalSets > 1) {
+                this.totalSets--;
+                this.updateSetsUI();
+            }
+        });
+        this.els.setsPlus.addEventListener('click', () => {
+            this.totalSets++;
+            this.updateSetsUI();
+        });
+
+        // Controls
+        this.els.startBtn.addEventListener('click', () => this.toggle());
+        this.els.stopBtn.addEventListener('click', () => this.stop());
+    }
+
+    updateChips(list, val) {
+        list.forEach(c => {
+            if (parseInt(c.dataset.val) === val) c.classList.add('active');
+            else c.classList.remove('active');
+        });
+    }
+
+    updateSetsUI() {
+        this.els.setsDisplay.textContent = this.totalSets;
+        this.els.totalSets.textContent = this.totalSets;
+    }
+
+    reset() {
+        this.phase = 'ready';
+        this.currentSet = 1;
+        this.timeLeft = this.workTime;
+        this.updateUI();
+    }
+
+    async toggle() {
         if (this.isRunning) {
             this.pause();
         } else {
@@ -174,137 +348,165 @@ class NikoRunApp {
     }
 
     async start() {
-        // Audio Init
-        const silentAudio = document.getElementById('silent-audio');
-        if (silentAudio) {
-            silentAudio.play().catch(e => console.warn("Audio play failed", e));
-        }
-
-        if (!this.audioContext) {
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (this.audioContext.state === 'suspended') {
-            await this.audioContext.resume();
-        }
-
-        await this.requestWakeLock();
+        await this.app.requestAudio();
+        await this.app.requestWakeLock();
 
         this.isRunning = true;
-        this.updatePlayPauseUI(true);
+        this.els.startBtn.textContent = '暂停';
 
-        // If finished, reset
-        if (this.timeLeft <= 0) {
-            this.timeLeft = this.initialDurationSecs;
-            this.updateTimeDisplay();
-            this.setProgress(1);
+        if (this.phase === 'ready' || this.phase === 'done') {
+            this.phase = 'work';
+            this.currentSet = 1;
+            this.timeLeft = this.workTime;
+            this.app.audio.playWorkBeep();
         }
 
-        // Metronome
-        this.nextNoteTime = this.audioContext.currentTime;
-
-        // Start Worker instead of local loop
-        this.timerWorker.postMessage("start");
-
-        // Need to clear local lastTick for the timer logic
-        this.lastTimerTick = Date.now();
+        this.updateUI();
+        this.app.startWorker();
     }
 
     pause() {
         this.isRunning = false;
-        this.updatePlayPauseUI(false);
-
-        // Stop Worker
-        if (this.timerWorker) {
-            this.timerWorker.postMessage("stop");
-        }
-
-        if (this.wakeLock) {
-            this.wakeLock.release().then(() => this.wakeLock = null);
-        }
+        this.els.startBtn.textContent = '开始';
+        this.app.stopWorker();
+        this.app.releaseWakeLock();
     }
 
-    stopAction() {
+    stop() {
         this.pause();
-        this.timeLeft = this.initialDurationSecs;
-        this.updateTimeDisplay();
-        this.setProgress(1);
+        this.reset();
     }
 
-    scheduler() {
-        // No loop here, just check if notes need scheduling
-        // while loop logic remains valid
-        while (this.nextNoteTime < this.audioContext.currentTime + this.scheduleAheadTime) {
-            this.scheduleNote(this.nextNoteTime);
-            this.nextStep();
+    updateUI() {
+        this.els.currentSet.textContent = this.currentSet;
+        this.els.timer.textContent = this.formatTime(this.timeLeft);
+
+        if (this.phase === 'ready') {
+            this.els.phaseLabel.textContent = "READY";
+            this.els.phaseLabel.className = "status-label";
+        } else if (this.phase === 'work') {
+            this.els.phaseLabel.textContent = "WORK";
+            this.els.phaseLabel.className = "status-label work";
+        } else if (this.phase === 'rest') {
+            this.els.phaseLabel.textContent = "REST";
+            this.els.phaseLabel.className = "status-label rest";
+        } else if (this.phase === 'done') {
+            this.els.phaseLabel.textContent = "DONE";
+            this.els.phaseLabel.className = "status-label work";
         }
     }
 
-    nextStep() {
-        const secondsPerBeat = 60.0 / this.bpm;
-        this.nextNoteTime += secondsPerBeat;
+    formatTime(sec) {
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     }
 
-    scheduleNote(time) {
-        const osc = this.audioContext.createOscillator();
-        const gainNode = this.audioContext.createGain();
-
-        osc.connect(gainNode);
-        gainNode.connect(this.audioContext.destination);
-
-        osc.type = 'sine';
-        osc.frequency.value = 880;
-
-        gainNode.gain.setValueAtTime(1, time);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
-
-        osc.start(time);
-        osc.stop(time + 0.06);
-    }
-
-    handleTimerTick() {
+    onTick(now, delta) {
         if (!this.isRunning) return;
-
-        const now = Date.now();
-        const delta = now - this.lastTimerTick;
 
         if (delta >= 1000) {
             this.timeLeft--;
-            this.updateTimeDisplay();
-
-            // Update Progress Ring
-            const percent = Math.max(0, this.timeLeft / this.initialDurationSecs);
-            this.setProgress(percent);
-
-            this.lastTimerTick = now;
-
-            if (this.timeLeft <= 0) {
-                this.finishRun();
+            if (this.timeLeft < 0) {
+                this.nextPhase();
+            } else {
+                this.updateUI();
             }
+            return true;
+        }
+        return false;
+    }
+
+    nextPhase() {
+        if (this.phase === 'work') {
+            // Work done -> Rest
+            this.app.audio.playRestBeep();
+            this.phase = 'rest';
+            this.timeLeft = this.restTime;
+        } else {
+            // Rest done -> Next Set or Done
+            if (this.currentSet >= this.totalSets) {
+                // Done
+                this.app.audio.playFinish();
+                this.phase = 'done';
+                this.pause();
+            } else {
+                // Next Set
+                this.currentSet++;
+                this.app.audio.playWorkBeep();
+                this.phase = 'work';
+                this.timeLeft = this.workTime;
+            }
+        }
+        this.updateUI();
+    }
+}
+
+// --- Main App ---
+class App {
+    constructor() {
+        this.audio = new AudioController();
+        this.worker = new Worker("tm-worker.js");
+        this.wakeLock = null;
+
+        this.niko = new NikoController(this);
+        this.interval = new IntervalController(this);
+
+        this.mode = 'niko'; // 'niko', 'interval'
+        this.activeController = this.niko;
+
+        this.lastTimerTick = 0;
+
+        this.init();
+    }
+
+    init() {
+        // Tab Switching
+        const tabNiko = document.getElementById('tab-niko');
+        const tabInterval = document.getElementById('tab-interval');
+
+        tabNiko.addEventListener('click', () => this.switchMode('niko'));
+        tabInterval.addEventListener('click', () => this.switchMode('interval'));
+
+        // Worker Msg
+        this.worker.onmessage = (e) => {
+            if (e.data === "tick") {
+                this.handleTick();
+            }
+        };
+    }
+
+    switchMode(mode) {
+        if (this.mode === mode) return;
+
+        // Stop current
+        this.activeController.stop();
+
+        // Switch
+        this.mode = mode;
+        this.activeController = (mode === 'niko') ? this.niko : this.interval;
+
+        // UI Toggle
+        const tabNiko = document.getElementById('tab-niko');
+        const tabInterval = document.getElementById('tab-interval');
+        const viewNiko = document.getElementById('view-niko');
+        const viewInterval = document.getElementById('view-interval');
+
+        if (mode === 'niko') {
+            tabNiko.classList.add('active');
+            tabInterval.classList.remove('active');
+            viewNiko.classList.remove('hidden');
+            viewInterval.classList.add('hidden');
+        } else {
+            tabInterval.classList.add('active');
+            tabNiko.classList.remove('active');
+            viewInterval.classList.remove('hidden');
+            viewNiko.classList.add('hidden');
         }
     }
 
-    finishRun() {
-        this.pause();
-        this.els.timeRemaining.textContent = "DONE";
-        this.playFinishSound();
-    }
-
-    playFinishSound() {
-        if (!this.audioContext) return;
-        const osc = this.audioContext.createOscillator();
-        const gainNode = this.audioContext.createGain();
-        osc.connect(gainNode);
-        gainNode.connect(this.audioContext.destination);
-
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(523.25, this.audioContext.currentTime);
-        osc.frequency.linearRampToValueAtTime(1046.5, this.audioContext.currentTime + 1);
-
-        gainNode.gain.setValueAtTime(1, this.audioContext.currentTime);
-        gainNode.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + 1);
-
-        osc.start();
-        osc.stop(this.audioContext.currentTime + 1);
+    async requestAudio() {
+        await this.audio.init();
     }
 
     async requestWakeLock() {
@@ -313,11 +515,39 @@ class NikoRunApp {
                 this.wakeLock = await navigator.wakeLock.request('screen');
             }
         } catch (err) {
-            console.error(`${err.name}, ${err.message}`);
+            console.error(err);
+        }
+    }
+
+    releaseWakeLock() {
+        if (this.wakeLock) {
+            this.wakeLock.release().then(() => this.wakeLock = null);
+        }
+    }
+
+    startWorker() {
+        this.worker.postMessage({ interval: 25.0 }); // ensure interval
+        this.worker.postMessage("start");
+        this.lastTimerTick = Date.now();
+    }
+
+    stopWorker() {
+        this.worker.postMessage("stop");
+    }
+
+    handleTick() {
+        const now = Date.now();
+        const delta = now - this.lastTimerTick;
+
+        const secondTicked = this.activeController.onTick(now, delta);
+
+        if (secondTicked) {
+            this.lastTimerTick = now;
         }
     }
 }
 
+// Start
 window.addEventListener('DOMContentLoaded', () => {
-    const app = new NikoRunApp();
+    window.app = new App();
 });

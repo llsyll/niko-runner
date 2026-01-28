@@ -23,63 +23,126 @@
         <!-- Silent Audio Loop Trigger -->
         <audio id="silent-audio" loop playsinline>
             <source
-                src="data:audio/mp3;base64,SUQzBAAAAAABAFRYWFgAAAASAAADbWFqb3JfYnJhbmQAbXA0MgBUWFhYAAAAEQAAA21pbm9yX3ZlcnNpb24AMABUWFhYAAAAHAAAA2NvbXBhdGlibZVfYnJhbmRzAGlzb21tcDQyAFRTU0UAAAAPAAADTGF2ZjU5LjI3LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIwAAQUFBRUVFRkpKSk9PT1BQUFZWVltbW15eXmNjY2hoaGxsbHJycnd3d3x8fIWFhYqKioyMjJKSkpWVlZqamp+fn6Kioqenp62tra+vr7Kysre3t7y8vMHBwcTExMrKys/Pz9PT09ra2t/f3+Tk5Ojo6Ozs7PLy8vb29v///wAAAANMYXZjNTkuMzcuMTAwAAAAAAAAAAAAAAAAIAbAAAAAAAAAAAAAAAAB//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA"
+                src="data:audio/mp3;base64,SUQzBAAAAAABAFRYWFgAAAASAAADbWFqb3JfYnJhbmQAbXA0MgBUWFhYAAAAEQAAA21pbm9yX3ZlcnNpb24AMABUWFhYAAAAHAAAA2NvbXBhdGlibZVfYnJhbmRzAGlzb21tcDQyAFRTU0UAAAAPAAADTGF2ZjU5LjI3LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIwAAQUFBRUVFRkpKSk9PT1BQUFZWVltbW15eXmNjY2hoaGxsbHJycnd3d3x8fIWFhYqKioyMjJKSkpWVlZqamp+fn6Kioqenp62tra+vr7Kysre3t7y8vMHBwcTExMrKys/Pz9PT09ra2t/f3+Tk5Ojo6Ozs7PLy8vb29v///wAAAANMYXZjNTkuMzcuMTAwAAAAAAAAAAAAAAAAIAbAAAAAAAAAAAAAAAAB//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA//tQZAAAAAAAOgAAAAAAAABAAAAAAAAAAAA"
                 type="audio/mpeg">
         </audio>
 
-        <!-- Top Section: Progress Ring & Play/Pause -->
-        <div class="progress-ring-container" id="play-pause-area">
-            <svg class="progress-ring" viewBox="0 0 300 200">
-                <!-- Background Track -->
-                <rect class="ring-bg" x="10" y="10" width="280" height="180" rx="40" ry="40" />
-                <!-- Progress Indicator (Stroke) -->
-                <rect class="ring-progress" id="progress-rect" x="10" y="10" width="280" height="180" rx="40" ry="40" />
-            </svg>
-
-            <div class="play-icon-container">
-                <!-- Play Icon (Triangle) -->
-                <svg id="icon-play" class="control-icon" viewBox="0 0 24 24" fill="none"
-                    xmlns="http://www.w3.org/2000/svg">
-                    <path d="M8 5V19L19 12L8 5Z" fill="white" />
-                </svg>
-                <!-- Pause Icon (Double Bar) -->
-                <svg id="icon-pause" class="control-icon hidden" viewBox="0 0 24 24" fill="none"
-                    xmlns="http://www.w3.org/2000/svg">
-                    <rect x="6" y="4" width="4" height="16" fill="white" />
-                    <rect x="14" y="4" width="4" height="16" fill="white" />
-                </svg>
-            </div>
+        <!-- Mode Switcher -->
+        <div class="mode-switcher">
+            <button id="tab-niko" class="tab-btn active">超慢跑</button>
+            <button id="tab-interval" class="tab-btn">间歇跑</button>
         </div>
 
-        <!-- Middle Section: Timer & Info -->
-        <div class="timer-section">
-            <div class="timer-label">剩余时间</div>
-            <div id="time-remaining" class="main-timer">20:00</div>
+        <!-- VIEW: Niko Running -->
+        <div id="view-niko" class="mode-view">
+            <!-- Top Section: Progress Ring & Play/Pause -->
+            <div class="progress-ring-container" id="play-pause-area">
+                <svg class="progress-ring" viewBox="0 0 300 200">
+                    <!-- Background Track -->
+                    <rect class="ring-bg" x="10" y="10" width="280" height="180" rx="40" ry="40" />
+                    <!-- Progress Indicator (Stroke) -->
+                    <rect class="ring-progress" id="progress-rect" x="10" y="10" width="280" height="180" rx="40"
+                        ry="40" />
+                </svg>
 
+                <div class="play-icon-container">
+                    <!-- Play Icon (Triangle) -->
+                    <svg id="icon-play" class="control-icon" viewBox="0 0 24 24" fill="none"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path d="M8 5V19L19 12L8 5Z" fill="white" />
+                    </svg>
+                    <!-- Pause Icon (Double Bar) -->
+                    <svg id="icon-pause" class="control-icon hidden" viewBox="0 0 24 24" fill="none"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <rect x="6" y="4" width="4" height="16" fill="white" />
+                        <rect x="14" y="4" width="4" height="16" fill="white" />
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Middle Section: Timer & Info -->
+            <div class="timer-section">
+                <div class="timer-label">剩余时间</div>
+                <div id="time-remaining" class="main-timer">20:00</div>
+
+                <div class="controls-row">
+                    <button id="start-btn" class="control-btn start-btn">开始</button>
+                    <button id="stop-btn" class="control-btn stop-btn">停止</button>
+                </div>
+            </div>
+
+            <!-- Hidden BPM Settings / Toggles -->
+            <div class="bpm-section">
+                <div class="bpm-controls">
+                    <input type="range" id="bpm-slider" min="150" max="200" value="180" class="slider">
+                    <div class="bpm-readout"><span id="current-bpm">180</span> BPM</div>
+                </div>
+            </div>
+
+            <!-- Bottom Section: Quick Duration Select -->
+            <div class="quick-actions">
+                <button class="chip active" data-time="5">5 mins</button>
+                <button class="chip" data-time="10">10 mins</button>
+                <button class="chip" data-time="15">15 mins</button>
+                <button class="chip" data-time="20">20 mins</button>
+                <button class="chip" data-time="25">25 mins</button>
+                <button class="chip" data-time="30">30 mins</button>
+                <button class="chip" data-time="45">45 mins</button>
+                <button class="chip" data-time="60">60 mins</button>
+            </div>
+        </div> <!-- End view-niko -->
+
+        <!-- VIEW: Interval Timer -->
+        <div id="view-interval" class="mode-view hidden">
+            <!-- Header/Status -->
+            <div class="interval-status">
+                <div class="status-label" id="int-phase-label">READY</div>
+                <div class="set-counter">Group <span id="int-current-set">1</span> / <span id="int-total-sets">10</span>
+                </div>
+            </div>
+
+            <!-- Big Timer -->
+            <div class="timer-section">
+                <div id="int-timer-display" class="main-timer interval-timer">00:05</div>
+            </div>
+
+            <!-- Controls -->
             <div class="controls-row">
-                <button id="start-btn" class="control-btn start-btn">开始</button>
-                <button id="stop-btn" class="control-btn stop-btn">停止</button>
+                <button id="int-start-btn" class="control-btn start-btn">开始</button>
+                <button id="int-stop-btn" class="control-btn stop-btn">停止</button>
             </div>
-        </div>
 
-        <!-- Hidden BPM Settings / Toggles -->
-        <div class="bpm-section">
-            <div class="bpm-controls">
-                <input type="range" id="bpm-slider" min="150" max="200" value="180" class="slider">
-                <div class="bpm-readout"><span id="current-bpm">180</span> BPM</div>
+            <!-- Settings -->
+            <div class="interval-settings">
+                <div class="setting-row">
+                    <label>运动 (Work)</label>
+                    <div class="setting-chips" id="chips-work">
+                        <button class="chip-sm" data-val="5">5s</button>
+                        <button class="chip-sm" data-val="10">10s</button>
+                        <button class="chip-sm active" data-val="20">20s</button>
+                        <button class="chip-sm" data-val="30">30s</button>
+                        <button class="chip-sm" data-val="45">45s</button>
+                        <button class="chip-sm" data-val="60">60s</button>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <label>休息 (Rest)</label>
+                    <div class="setting-chips" id="chips-rest">
+                        <button class="chip-sm active" data-val="5">5s</button>
+                        <button class="chip-sm" data-val="10">10s</button>
+                        <button class="chip-sm" data-val="20">20s</button>
+                        <button class="chip-sm" data-val="30">30s</button>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <label>组数 (Sets)</label>
+                    <div class="stepper">
+                        <button class="stepper-btn" id="sets-minus">-</button>
+                        <span id="sets-display">10</span>
+                        <button class="stepper-btn" id="sets-plus">+</button>
+                    </div>
+                </div>
             </div>
-        </div>
-
-        <!-- Bottom Section: Quick Duration Select -->
-        <div class="quick-actions">
-            <button class="chip active" data-time="5">5 mins</button>
-            <button class="chip" data-time="10">10 mins</button>
-            <button class="chip" data-time="15">15 mins</button>
-            <button class="chip" data-time="20">20 mins</button>
-            <button class="chip" data-time="25">25 mins</button>
-            <button class="chip" data-time="30">30 mins</button>
-            <button class="chip" data-time="45">45 mins</button>
-            <button class="chip" data-time="60">60 mins</button>
         </div>
     </div>
 
