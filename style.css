@@ -126,11 +126,30 @@ body {
     fill: white;
 }
 
-.hidden {
-    display: none;
+/* Mobile Overflow Fix */
+@media (max-height: 700px) {
+    .app-container {
+        padding-top: 20px;
+        justify-content: flex-start;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .progress-ring-container {
+        height: 25vh;
+        min-height: 200px;
+    }
+
+    .main-timer {
+        font-size: 4rem;
+    }
 }
 
-/* Timer Section */
+/* Ensure hidden always wins */
+.hidden {
+    display: none !important;
+}
+
 .timer-section {
     text-align: center;
     display: flex;

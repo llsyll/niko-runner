@@ -47,9 +47,9 @@ class AudioController {
         this.playTone(880, 0.1, 'square');
     }
 
-    // Interval: Rest Start (Low Beep)
+    // Interval: Rest Start (Low Beep, distinct)
     playRestBeep() {
-        this.playTone(440, 0.1, 'sine');
+        this.playTone(330, 0.2, 'triangle');
     }
 
     // Finish Sound
