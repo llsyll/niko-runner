@@ -24,7 +24,7 @@ class AudioController {
         return this.ctx ? this.ctx.currentTime : 0;
     }
 
-    // Metronome Tick
+    // Metronome Tick (Standard 880Hz)
     scheduleTick(time) {
         if (!this.ctx) return;
         const osc = this.ctx.createOscillator();
@@ -42,7 +42,7 @@ class AudioController {
         osc.stop(time + 0.06);
     }
 
-    // Interval: Work Start (High Beep)
+    // Interval: Work Start (High Beep + Metronome)
     playWorkBeep() {
         this.playTone(880, 0.1, 'square');
     }
@@ -113,7 +113,6 @@ class NikoController {
             playArea: document.getElementById('play-pause-area'),
             iconPlay: document.getElementById('icon-play'),
             iconPause: document.getElementById('icon-pause'),
-            iconPause: document.getElementById('icon-pause'),
             progressCircle: document.getElementById('progress-circle'),
             startBtn: document.getElementById('start-btn'),
             stopBtn: document.getElementById('stop-btn'),
@@ -123,7 +122,6 @@ class NikoController {
         };
 
         // Ring Calc (Circle)
-        // r = 105 (as set in HTML)
         const r = 105;
         this.ringPerimeter = 2 * Math.PI * r;
 
@@ -264,11 +262,17 @@ class IntervalController {
         this.workTime = 20;
         this.restTime = 5;
         this.totalSets = 10;
+        this.bpm = 180; // Hardcoded per requirement
 
         // State
         this.phase = 'ready'; // ready, work, rest, done
         this.currentSet = 1;
         this.timeLeft = this.workTime;
+        this.totalTimeLeft = 0; // Total duration remaining
+
+        // Metronome
+        this.nextNoteTime = 0.0;
+        this.scheduleAheadTime = 0.1;
 
         // UI
         this.els = {
@@ -276,6 +280,7 @@ class IntervalController {
             phaseLabel: document.getElementById('int-phase-label'),
             currentSet: document.getElementById('int-current-set'),
             totalSets: document.getElementById('int-total-sets'),
+            totalLeft: document.getElementById('int-total-left'),
             timer: document.getElementById('int-timer-display'),
             startBtn: document.getElementById('int-start-btn'),
             stopBtn: document.getElementById('int-stop-btn'),
@@ -286,6 +291,8 @@ class IntervalController {
         };
 
         this.initEvents();
+        this.calculateTotalTime();
+        this.updateUI();
     }
 
     initEvents() {
@@ -312,7 +319,7 @@ class IntervalController {
             btn.addEventListener('click', () => {
                 this.totalSets = parseInt(btn.dataset.val);
                 this.updateChips(this.els.chipsSets, this.totalSets);
-                this.updateSetsUI();
+                if (!this.isRunning) this.reset();
             });
         });
 
@@ -328,14 +335,42 @@ class IntervalController {
         });
     }
 
-    updateSetsUI() {
-        this.els.totalSets.textContent = this.totalSets;
+    calculateTotalTime() {
+        // Total time = Sets * (Work + Rest) 
+        // *Optimally, last rest might be skipped, but simplistically we keep it or just subtract it if needed
+        // Requirement: "Visual reminder to observe overall remaining time"
+        // Let's assume full loops for simplicity
+        const setsLeft = this.totalSets - this.currentSet + 1;
+        // If we are in 'ready', full sets. If current, adjust.
+        // Simplified: Recalculate based on current timeLeft + remaining sets
+
+        let remaining = 0;
+
+        if (this.phase === 'ready' || this.phase === 'done') {
+            remaining = this.totalSets * (this.workTime + this.restTime);
+        } else {
+            // Current set remainder
+            remaining += this.timeLeft;
+            // Add Rest if currently Working
+            if (this.phase === 'work') {
+                remaining += this.restTime;
+            }
+
+            // Pending sets (excluding current)
+            const pendingSets = this.totalSets - this.currentSet;
+            if (pendingSets > 0) {
+                remaining += pendingSets * (this.workTime + this.restTime);
+            }
+        }
+
+        this.totalTimeLeft = remaining;
     }
 
     reset() {
         this.phase = 'ready';
         this.currentSet = 1;
         this.timeLeft = this.workTime;
+        this.calculateTotalTime();
         this.updateUI();
     }
 
@@ -358,8 +393,12 @@ class IntervalController {
             this.phase = 'work';
             this.currentSet = 1;
             this.timeLeft = this.workTime;
+            this.calculateTotalTime();
             this.app.audio.playWorkBeep();
         }
+
+        // Sync Metronome
+        this.nextNoteTime = this.app.audio.getCurrentTime();
 
         this.updateUI();
         this.app.startWorker();
@@ -379,7 +418,11 @@ class IntervalController {
 
     updateUI() {
         this.els.currentSet.textContent = this.currentSet;
+        this.els.totalSets.textContent = this.totalSets;
         this.els.timer.textContent = this.formatTime(this.timeLeft);
+
+        // Total Time
+        this.els.totalLeft.textContent = this.formatTime(this.totalTimeLeft);
 
         if (this.phase === 'ready') {
             this.els.phaseLabel.textContent = "READY";
@@ -397,6 +440,7 @@ class IntervalController {
     }
 
     formatTime(sec) {
+        if (sec < 0) sec = 0; // Prevent -1 display
         const m = Math.floor(sec / 60);
         const s = sec % 60;
         return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
@@ -405,9 +449,23 @@ class IntervalController {
     onTick(now, delta) {
         if (!this.isRunning) return;
 
+        // Metronome while Working
+        if (this.phase === 'work') {
+            while (this.nextNoteTime < this.app.audio.getCurrentTime() + this.scheduleAheadTime) {
+                this.app.audio.scheduleTick(this.nextNoteTime);
+                this.nextNoteTime += (60.0 / this.bpm);
+            }
+        } else {
+            // Keep note time synced so it doesn't burst on next start
+            this.nextNoteTime = this.app.audio.getCurrentTime();
+        }
+
         if (delta >= 1000) {
             this.timeLeft--;
-            if (this.timeLeft < 0) {
+            this.totalTimeLeft--;
+
+            if (this.timeLeft <= 0) {
+                // Must handle phase switch immediately to avoid -1
                 this.nextPhase();
             } else {
                 this.updateUI();
@@ -418,6 +476,8 @@ class IntervalController {
     }
 
     nextPhase() {
+        // Force 0 for visual cleaniness before switch if needed, 
+        // but typically we switch immediately at 0
         if (this.phase === 'work') {
             // Work done -> Rest
             this.app.audio.playRestBeep();
@@ -429,7 +489,11 @@ class IntervalController {
                 // Done
                 this.app.audio.playFinish();
                 this.phase = 'done';
+                this.timeLeft = 0;
+                this.totalTimeLeft = 0;
+                this.updateUI();
                 this.pause();
+                return; // Stop here
             } else {
                 // Next Set
                 this.currentSet++;
@@ -438,6 +502,8 @@ class IntervalController {
                 this.timeLeft = this.workTime;
             }
         }
+        // Recalculate Total Time exactly to avoid drift
+        this.calculateTotalTime();
         this.updateUI();
     }
 }

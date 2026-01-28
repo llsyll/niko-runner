@@ -369,6 +369,13 @@ body {
     font-size: 1rem;
 }
 
+.total-remaining {
+    color: var(--accent-color);
+    margin-top: 4px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
 /* Interval Settings */
 .interval-settings {
     width: 100%;
