@@ -79,32 +79,28 @@ body {
     margin-top: 10px;
 }
 
-.progress-ring {
-    width: 100%;
-    height: 100%;
-    transform: rotate(-90deg);
-    /* Start from top */
-}
-
-.ring-bg {
-    fill: #111;
-    /* Inner dark distinct from bg */
-    stroke: #2C2C2E;
-    stroke-width: 0;
-}
-
 .ring-progress {
     fill: none;
     stroke: var(--accent-color);
-    stroke-width: 25;
+    stroke-width: 20;
     /* Thick stroke */
     stroke-linecap: round;
-    stroke-dasharray: 840;
-    /* Approximate perimeter */
+    /* dasharray will be set by JS */
     stroke-dashoffset: 0;
     /* Full ring */
     transition: stroke-dashoffset 0.1s linear;
+    transform-origin: center;
+    transform: rotate(-90deg);
 }
+
+.progress-ring {
+    width: auto;
+    /* Let height determine width */
+    height: 100%;
+    /* No global rotate needed on svg if circle rotates */
+}
+
+
 
 /* Play/Pause Icons centered */
 .play-icon-container {

@@ -47,14 +47,13 @@ class AudioController {
         this.playTone(880, 0.1, 'square');
     }
 
-    // Interval: Rest Start (Double Low Beep)
+    // Interval: Rest Start (Clearer High Pitch)
     playRestBeep() {
-        // First beep
-        this.playTone(330, 0.15, 'triangle');
-        // Second beep slightly later
+        // High "Ding-Dong" type sound
+        this.playTone(660, 0.1, 'sine');
         setTimeout(() => {
-            this.playTone(330, 0.4, 'triangle');
-        }, 200);
+            this.playTone(550, 0.3, 'sine');
+        }, 120);
     }
 
     // Finish Sound
@@ -114,7 +113,8 @@ class NikoController {
             playArea: document.getElementById('play-pause-area'),
             iconPlay: document.getElementById('icon-play'),
             iconPause: document.getElementById('icon-pause'),
-            progressRect: document.getElementById('progress-rect'),
+            iconPause: document.getElementById('icon-pause'),
+            progressCircle: document.getElementById('progress-circle'),
             startBtn: document.getElementById('start-btn'),
             stopBtn: document.getElementById('stop-btn'),
             bpmSlider: document.getElementById('bpm-slider'),
@@ -122,11 +122,13 @@ class NikoController {
             chips: document.querySelectorAll('#view-niko .chip'),
         };
 
-        // Ring Calc
-        const w = 280, h = 180, r = 40;
-        this.ringPerimeter = 2 * (w - 2 * r) + 2 * (h - 2 * r) + 2 * Math.PI * r;
-        this.els.progressRect.style.strokeDasharray = `${this.ringPerimeter} ${this.ringPerimeter}`;
-        this.els.progressRect.style.strokeDashoffset = 0;
+        // Ring Calc (Circle)
+        // r = 105 (as set in HTML)
+        const r = 105;
+        this.ringPerimeter = 2 * Math.PI * r;
+
+        this.els.progressCircle.style.strokeDasharray = `${this.ringPerimeter} ${this.ringPerimeter}`;
+        this.els.progressCircle.style.strokeDashoffset = 0;
 
         this.initEvents();
     }
@@ -222,7 +224,7 @@ class NikoController {
 
     setProgress(percent) {
         const offset = this.ringPerimeter - (percent * this.ringPerimeter);
-        this.els.progressRect.style.strokeDashoffset = offset;
+        this.els.progressCircle.style.strokeDashoffset = offset;
     }
 
     // Called by Main App on specific interval (e.g. 25ms)
