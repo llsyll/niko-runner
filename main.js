@@ -440,10 +440,11 @@ class IntervalController {
 
     updateTotalProgress() {
         if (this.totalDuration <= 0) {
-            this.els.totalProgressBar.style.width = '0%';
+            this.els.totalProgressBar.style.width = '100%';
             return;
         }
-        const pct = Math.min(100, (this.elapsedTime / this.totalDuration) * 100);
+        // Invert: 100% at start, 0% at end
+        const pct = Math.max(0, 100 - ((this.elapsedTime / this.totalDuration) * 100));
         this.els.totalProgressBar.style.width = `${pct}%`;
     }
 
