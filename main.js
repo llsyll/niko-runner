@@ -280,7 +280,7 @@ class IntervalController {
             phaseLabel: document.getElementById('int-phase-label'),
             currentSet: document.getElementById('int-current-set'),
             totalSets: document.getElementById('int-total-sets'),
-            totalLeft: document.getElementById('int-total-left'),
+            totalProgressFill: document.getElementById('total-progress-fill'),
             timer: document.getElementById('int-timer-display'),
             startBtn: document.getElementById('int-start-btn'),
             stopBtn: document.getElementById('int-stop-btn'),
@@ -302,6 +302,7 @@ class IntervalController {
                 this.workTime = parseInt(btn.dataset.val);
                 this.updateChips(this.els.chipsWork, this.workTime);
                 if (!this.isRunning) this.reset();
+                else this.calculateTotalTime(); // dynamic update if running
             });
         });
 
@@ -311,6 +312,7 @@ class IntervalController {
                 this.restTime = parseInt(btn.dataset.val);
                 this.updateChips(this.els.chipsRest, this.restTime);
                 if (!this.isRunning) this.reset();
+                else this.calculateTotalTime();
             });
         });
 
@@ -320,6 +322,7 @@ class IntervalController {
                 this.totalSets = parseInt(btn.dataset.val);
                 this.updateChips(this.els.chipsSets, this.totalSets);
                 if (!this.isRunning) this.reset();
+                else this.calculateTotalTime();
             });
         });
 
@@ -331,23 +334,20 @@ class IntervalController {
     updateChips(list, val) {
         list.forEach(c => {
             if (parseInt(c.dataset.val) === val) c.classList.add('active');
-            else c.classList.remove('active');
-        });
-    }
+        }
 
     calculateTotalTime() {
-        // Total time = Sets * (Work + Rest) 
-        // *Optimally, last rest might be skipped, but simplistically we keep it or just subtract it if needed
-        // Requirement: "Visual reminder to observe overall remaining time"
-        // Let's assume full loops for simplicity
-        const setsLeft = this.totalSets - this.currentSet + 1;
-        // If we are in 'ready', full sets. If current, adjust.
-        // Simplified: Recalculate based on current timeLeft + remaining sets
+            // Full Duration for progress calc
+            const fullDuration = this.totalSets * (this.workTime + this.restTime);
+            this.initialTotalDuration = fullDuration;
 
-        let remaining = 0;
+            // Remaining calc
+            let remaining = 0;
 
-        if (this.phase === 'ready' || this.phase === 'done') {
-            remaining = this.totalSets * (this.workTime + this.restTime);
+            if(this.phase === 'ready') {
+            remaining = fullDuration;
+        } else if (this.phase === 'done') {
+            remaining = 0;
         } else {
             // Current set remainder
             remaining += this.timeLeft;
@@ -421,8 +421,13 @@ class IntervalController {
         this.els.totalSets.textContent = this.totalSets;
         this.els.timer.textContent = this.formatTime(this.timeLeft);
 
-        // Total Time
-        this.els.totalLeft.textContent = this.formatTime(this.totalTimeLeft);
+
+
+        // Total Progress Bar
+        const percentLeft = this.initialTotalDuration > 0 ? (this.totalTimeLeft / this.initialTotalDuration) : 0;
+        // SVG width is 200
+        const fillWidth = 200 * (1 - percentLeft); // Grow from 0 to 200
+        this.els.totalProgressFill.setAttribute('width', Math.min(200, Math.max(0, fillWidth)));
 
         if (this.phase === 'ready') {
             this.els.phaseLabel.textContent = "READY";

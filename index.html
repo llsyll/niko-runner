@@ -98,8 +98,14 @@
                 <div class="status-label" id="int-phase-label">READY</div>
                 <div class="set-counter">Group <span id="int-current-set">1</span> / <span id="int-total-sets">10</span>
                 </div>
-                <!-- Total Remaining Time -->
-                <div class="total-remaining">Total Left: <span id="int-total-left">--:--</span></div>
+                <!-- Total Progress Bar -->
+                <div class="total-progress-container">
+                    <svg class="progress-line" width="200" height="20" viewBox="0 0 200 20" preserveAspectRatio="none">
+                        <rect class="line-bg" x="0" y="0" width="200" height="20" rx="10" ry="10" />
+                        <rect class="line-fill" id="total-progress-fill" x="0" y="0" width="0" height="20" rx="10"
+                            ry="10" />
+                    </svg>
+                </div>
             </div>
 
             <!-- Big Timer -->
