@@ -129,6 +129,7 @@ class NikoController {
         this.els.progressCircle.style.strokeDashoffset = 0;
 
         this.initEvents();
+        this.reset();
     }
 
     initEvents() {
