@@ -381,6 +381,12 @@ class IntervalController {
         await this.app.requestAudio();
         await this.app.requestWakeLock();
 
+        // Start silent audio for iOS background
+        const silent = document.getElementById('silent-audio');
+        if (silent) {
+            silent.play().catch(e => console.warn("Silent audio play failed", e));
+        }
+
         this.isRunning = true;
         this.els.startBtn.textContent = '暂停';
 
