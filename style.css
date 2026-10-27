@@ -327,12 +327,13 @@ body {
     background: transparent;
     border: none;
     color: var(--text-secondary);
-    padding: 8px 24px;
+    padding: 8px 18px;
     border-radius: 16px;
-    font-size: 0.9rem;
+    font-size: 0.88rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
+    white-space: nowrap;
 }
 
 .tab-btn.active {
@@ -490,4 +491,669 @@ body {
     background-color: var(--accent-color);
     border-radius: 4px;
     transition: width 1s linear;
+}
+
+/* =========================================================
+   Smart Bodyweight Strength & Google Health Integration UI
+   ========================================================= */
+
+.strength-view {
+    justify-content: flex-start;
+    gap: 12px;
+    overflow-y: auto;
+    padding-bottom: 10px;
+    scrollbar-width: none;
+}
+
+.strength-view::-webkit-scrollbar {
+    display: none;
+}
+
+/* Top Health Sync Bar */
+.health-sync-bar {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #141416;
+    border: 1px solid #28282B;
+    border-radius: 14px;
+    padding: 8px 12px;
+    flex-shrink: 0;
+}
+
+.health-source-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #D1D1D6;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #FFD60A;
+    box-shadow: 0 0 6px rgba(255, 214, 10, 0.6);
+}
+
+.status-dot.connected {
+    background: var(--accent-color);
+    box-shadow: 0 0 8px rgba(190, 251, 70, 0.7);
+}
+
+.health-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.btn-icon-text {
+    background: #2C2C2E;
+    color: #E5E5EA;
+    border: 1px solid transparent;
+    padding: 5px 10px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn-icon-text.accent-outline {
+    border-color: rgba(190, 251, 70, 0.4);
+    color: var(--accent-color);
+}
+
+.btn-icon-text:active {
+    transform: scale(0.96);
+}
+
+/* Readiness Card */
+.readiness-card {
+    width: 100%;
+    background: #161618;
+    border: 1px solid #2C2C2E;
+    border-radius: 18px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.readiness-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.readiness-score-box {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    background: var(--accent-dim);
+    border: 1.5px solid var(--accent-color);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.readiness-score-box.tier-mid {
+    background: rgba(255, 214, 10, 0.14);
+    border-color: #FFD60A;
+}
+
+.readiness-score-box.tier-low {
+    background: rgba(255, 69, 58, 0.14);
+    border-color: var(--danger-color);
+}
+
+.score-number {
+    font-size: 1.55rem;
+    font-weight: 900;
+    line-height: 1;
+    color: var(--accent-color);
+}
+
+.readiness-score-box.tier-mid .score-number {
+    color: #FFD60A;
+}
+
+.readiness-score-box.tier-low .score-number {
+    color: var(--danger-color);
+}
+
+.score-unit {
+    font-size: 0.65rem;
+    color: #AEAEB2;
+    margin-top: 2px;
+    font-weight: 600;
+}
+
+.readiness-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.readiness-tier {
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: #FFFFFF;
+}
+
+.readiness-rationale {
+    font-size: 0.76rem;
+    line-height: 1.38;
+    color: #98989F;
+}
+
+/* 4 Core Vitals Grid */
+.vitals-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+}
+
+.vital-item {
+    background: #222225;
+    border-radius: 11px;
+    padding: 7px 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 2px;
+}
+
+.vital-label {
+    font-size: 0.66rem;
+    color: var(--text-secondary);
+}
+
+.vital-val {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #FFF;
+}
+
+.vital-val small {
+    font-size: 0.65rem;
+    font-weight: 500;
+    color: #8E8E93;
+}
+
+/* Focus Chips */
+.focus-chips {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.focus-chips::-webkit-scrollbar {
+    display: none;
+}
+
+.chip-xs {
+    background: #262629;
+    border: 1px solid #363639;
+    color: #98989F;
+    padding: 5px 11px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    flex: 0 0 auto;
+    transition: all 0.15s;
+}
+
+.chip-xs.active {
+    background: var(--accent-dim);
+    color: var(--accent-color);
+    border-color: var(--accent-color);
+}
+
+/* Plan List Container */
+.strength-plan-container {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+}
+
+.plan-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 4px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #D1D1D6;
+}
+
+.plan-est-time {
+    color: var(--accent-color);
+    font-size: 0.76rem;
+    font-weight: 600;
+}
+
+.strength-plan-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ex-card {
+    background: #18181B;
+    border: 1px solid #28282C;
+    border-radius: 14px;
+    padding: 10px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    transition: border-color 0.2s;
+}
+
+.ex-card.active-ex {
+    border-color: var(--accent-color);
+    background: rgba(190, 251, 70, 0.06);
+}
+
+.ex-card-left {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.ex-title-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.ex-index {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #2C2C2E;
+    color: var(--accent-color);
+    font-size: 0.7rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ex-name {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #FFF;
+}
+
+.ex-muscle-tag {
+    font-size: 0.68rem;
+    color: #8E8E93;
+    background: #262629;
+    padding: 1px 6px;
+    border-radius: 6px;
+}
+
+.ex-cue {
+    font-size: 0.73rem;
+    color: #8E8E93;
+}
+
+.ex-card-right {
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.ex-Prescription {
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: var(--accent-color);
+}
+
+.ex-rest-note {
+    font-size: 0.68rem;
+    color: #8E8E93;
+    margin-top: 2px;
+}
+
+/* Cardio Synergy Recommendation Card */
+.cardio-synergy-card {
+    background: linear-gradient(135deg, rgba(190, 251, 70, 0.12), rgba(28, 28, 30, 0.9));
+    border: 1px solid rgba(190, 251, 70, 0.35);
+    border-radius: 14px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 2px;
+}
+
+.synergy-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--accent-color);
+}
+
+.synergy-desc {
+    font-size: 0.8rem;
+    color: #E5E5EA;
+    margin-top: 2px;
+    font-weight: 600;
+}
+
+.synergy-btn {
+    background: var(--accent-color);
+    color: #000;
+    border: none;
+    border-radius: 10px;
+    padding: 6px 12px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+/* Active Strength Guided Player */
+.strength-player {
+    width: 100%;
+    background: #18181B;
+    border: 1.5px solid var(--accent-color);
+    border-radius: 18px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.player-top-meta {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.phase-pill {
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 3px 9px;
+    border-radius: 10px;
+    text-transform: uppercase;
+}
+
+.phase-pill.work {
+    background: var(--accent-dim);
+    color: var(--accent-color);
+}
+
+.phase-pill.rest {
+    background: rgba(255, 69, 58, 0.2);
+    color: var(--danger-color);
+}
+
+.player-meta-text {
+    font-size: 0.76rem;
+    color: #AEAEB2;
+    font-weight: 600;
+}
+
+.player-ex-name {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: #FFF;
+    margin-top: 2px;
+}
+
+.player-ex-target {
+    font-size: 0.8rem;
+    color: var(--accent-color);
+    font-weight: 600;
+}
+
+.player-timer {
+    font-size: 3.4rem;
+    font-weight: 700;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -1px;
+    margin: 4px 0;
+}
+
+.player-progress-wrap {
+    width: 100%;
+    margin-top: 2px;
+}
+
+.player-next-up {
+    font-size: 0.75rem;
+    color: #8E8E93;
+    margin-top: 2px;
+}
+
+.player-controls {
+    display: flex;
+    gap: 10px;
+    margin-top: 6px;
+    width: 100%;
+}
+
+.btn-sm {
+    flex: 1;
+    padding: 10px 12px;
+    font-size: 0.9rem;
+    min-width: 0;
+}
+
+.strength-bottom-bar {
+    width: 100%;
+    padding-top: 4px;
+    flex-shrink: 0;
+}
+
+.full-width-btn {
+    width: 100%;
+    padding: 13px 24px;
+    font-size: 1.05rem;
+}
+
+/* Modal Styles */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.82);
+    backdrop-filter: blur(8px);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+.modal-card {
+    background: #1C1C1E;
+    border: 1px solid #333336;
+    border-radius: 22px;
+    width: 100%;
+    max-width: 420px;
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 18px;
+    border-bottom: 1px solid #2C2C2E;
+}
+
+.modal-header h3 {
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: #8E8E93;
+    font-size: 1.5rem;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.modal-body {
+    padding: 14px 18px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.form-group label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #AEAEB2;
+}
+
+.provider-switch {
+    display: flex;
+    gap: 8px;
+}
+
+.text-input {
+    background: #111113;
+    border: 1px solid #3A3A3C;
+    border-radius: 10px;
+    padding: 9px 12px;
+    color: #FFF;
+    font-size: 0.82rem;
+    outline: none;
+    user-select: text;
+    -webkit-user-select: text;
+}
+
+.text-input:focus {
+    border-color: var(--accent-color);
+}
+
+.helper-text {
+    font-size: 0.7rem;
+    color: #8E8E93;
+    word-break: break-all;
+}
+
+.helper-text code {
+    color: var(--accent-color);
+    user-select: all;
+    -webkit-user-select: all;
+}
+
+.oauth-btn-row {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-secondary,
+.btn-primary-sm {
+    flex: 1;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+}
+
+.btn-secondary {
+    background: #2C2C2E;
+    color: #FFF;
+    border: 1px solid #48484A;
+}
+
+.btn-primary-sm {
+    background: var(--accent-dim);
+    color: var(--accent-color);
+    border: 1px solid var(--accent-color);
+}
+
+.api-feedback {
+    font-size: 0.76rem;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #262629;
+    color: #E5E5EA;
+}
+
+.api-feedback.success {
+    background: rgba(190, 251, 70, 0.14);
+    color: var(--accent-color);
+}
+
+.api-feedback.error {
+    background: rgba(255, 69, 58, 0.18);
+    color: #FF6961;
+}
+
+.modal-divider {
+    border: none;
+    border-top: 1px solid #2C2C2E;
+    margin: 2px 0;
+}
+
+.calibration-header {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #E5E5EA;
+}
+
+.calib-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 12px;
+}
+
+.calib-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.calib-item label {
+    font-size: 0.72rem;
+    color: #98989F;
+    display: flex;
+    justify-content: space-between;
+}
+
+.calib-item label span {
+    color: var(--accent-color);
+    font-weight: 700;
+}
+
+.modal-footer {
+    padding: 12px 18px;
+    border-top: 1px solid #2C2C2E;
 }

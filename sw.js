@@ -1,9 +1,10 @@
-const CACHE_NAME = 'niko-run-v1';
+const CACHE_NAME = 'niko-run-v2';
 const ASSETS = [
     './',
     './index.html',
     './style.css',
     './main.js',
+    './tm-worker.js',
     './manifest.json'
 ];
 

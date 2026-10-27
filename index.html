@@ -16,6 +16,7 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 
 <body>
@@ -31,6 +32,7 @@
         <div class="mode-switcher">
             <button id="tab-niko" class="tab-btn active">超慢跑</button>
             <button id="tab-interval" class="tab-btn">间歇运动</button>
+            <button id="tab-strength" class="tab-btn">科学力量</button>
         </div>
 
         <!-- VIEW: Niko Running -->
@@ -151,10 +153,201 @@
                 </div>
             </div>
         </div>
+
+        <!-- VIEW: Smart Bodyweight Strength Training -->
+        <div id="view-strength" class="mode-view strength-view hidden">
+            <!-- Top Health Sync Bar -->
+            <div class="health-sync-bar">
+                <div class="health-source-badge" id="health-sync-status">
+                    <span class="status-dot" id="health-status-dot"></span>
+                    <span id="health-status-text">Google Health · 待同步</span>
+                </div>
+                <div class="health-actions">
+                    <button id="btn-sync-now" class="btn-icon-text" title="立即从 API 同步今日健康数据">同步</button>
+                    <button id="btn-health-config" class="btn-icon-text accent-outline">API / 指标</button>
+                </div>
+            </div>
+
+            <!-- Readiness & Vitals Summary Card -->
+            <div class="readiness-card" id="readiness-card">
+                <div class="readiness-header">
+                    <div class="readiness-score-box">
+                        <div class="score-number" id="readiness-score">82</div>
+                        <div class="score-unit">准备度</div>
+                    </div>
+                    <div class="readiness-summary">
+                        <div class="readiness-tier" id="readiness-tier-title">状态极佳 · 肌力进阶</div>
+                        <div class="readiness-rationale" id="readiness-rationale">
+                            静息心率平稳，睡眠恢复充足，建议执行标准容量全身徒手肌力训练。
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4 Core Vitals Grid -->
+                <div class="vitals-grid">
+                    <div class="vital-item">
+                        <span class="vital-label">静息心率</span>
+                        <span class="vital-val" id="vital-rhr">58 <small>bpm</small></span>
+                    </div>
+                    <div class="vital-item">
+                        <span class="vital-label">心率变异 HRV</span>
+                        <span class="vital-val" id="vital-hrv">62 <small>ms</small></span>
+                    </div>
+                    <div class="vital-item">
+                        <span class="vital-label">昨晚睡眠</span>
+                        <span class="vital-val" id="vital-sleep">7.5 <small>h</small></span>
+                    </div>
+                    <div class="vital-item">
+                        <span class="vital-label">昨日负荷</span>
+                        <span class="vital-val" id="vital-load">32 <small>min</small></span>
+                    </div>
+                </div>
+
+                <!-- Focus Filter Chips -->
+                <div class="focus-chips" id="strength-focus-chips">
+                    <button class="chip-xs active" data-focus="golden">3+2 黄金补齐</button>
+                    <button class="chip-xs" data-focus="auto">智能自适应</button>
+                    <button class="chip-xs" data-focus="classic3">经典老三样</button>
+                    <button class="chip-xs" data-focus="lower">跑步护膝</button>
+                    <button class="chip-xs" data-focus="recovery">恢复拉伸</button>
+                </div>
+            </div>
+
+            <!-- Active Guided Workout Player (Shown during active strength session) -->
+            <div id="strength-player-panel" class="strength-player hidden">
+                <div class="player-top-meta">
+                    <span id="str-phase-badge" class="phase-pill work">动作进行中</span>
+                    <span id="str-progress-meta" class="player-meta-text">动作 1/5 · 第 1/4 组</span>
+                </div>
+                <div id="str-current-ex-name" class="player-ex-name">标准俯卧撑</div>
+                <div id="str-current-ex-target" class="player-ex-target">建议 12-15 次 · 保持核心收紧</div>
+                <div id="str-timer-display" class="player-timer">00:40</div>
+                <div class="total-progress-container player-progress-wrap">
+                    <div id="str-total-progress" class="total-progress-bar"></div>
+                </div>
+                <div id="str-next-up" class="player-next-up">下一项：组间休息 30s</div>
+                <div class="player-controls">
+                    <button id="str-pause-btn" class="control-btn start-btn btn-sm">暂停</button>
+                    <button id="str-skip-btn" class="control-btn stop-btn btn-sm">跳过</button>
+                    <button id="str-stop-btn" class="control-btn stop-btn btn-sm">结束</button>
+                </div>
+            </div>
+
+            <!-- Prescribed Plan List (Shown when not actively in full-screen player or below) -->
+            <div id="strength-plan-container" class="strength-plan-container">
+                <div class="plan-section-header">
+                    <span id="plan-header-title">今日徒手力量处方</span>
+                    <span id="plan-total-est" class="plan-est-time">预计 16 分钟</span>
+                </div>
+                <div id="strength-plan-list" class="strength-plan-list">
+                    <!-- Populated dynamically by StrengthController -->
+                </div>
+
+                <!-- Cardio Synergy Recommendation Card -->
+                <div class="cardio-synergy-card" id="cardio-synergy-card">
+                    <div class="synergy-info">
+                        <div class="synergy-title">心肺联动建议（力量后有氧）</div>
+                        <div class="synergy-desc" id="synergy-desc">15 分钟超慢跑 · 180 BPM 最佳燃脂步频</div>
+                    </div>
+                    <button id="btn-apply-niko" class="synergy-btn">去慢跑</button>
+                </div>
+            </div>
+
+            <!-- Bottom Start Action -->
+            <div class="strength-bottom-bar" id="strength-bottom-bar">
+                <button id="str-start-workout-btn" class="control-btn start-btn full-width-btn">开始今日跟练</button>
+            </div>
+        </div>
+
+        <!-- MODAL: Google Health / Fitbit API & Physiological Calibration -->
+        <div id="health-modal" class="modal-overlay hidden">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <h3>Google Health / Fitbit 数据接入</h3>
+                    <button id="btn-close-modal" class="modal-close">&times;</button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>数据源类型</label>
+                        <div class="provider-switch" id="provider-switch">
+                            <button type="button" class="chip-xs active" data-provider="google_fit">Google Fit API</button>
+                            <button type="button" class="chip-xs" data-provider="fitbit">Fitbit Web API</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label id="client-id-label">OAuth 2.0 Client ID（已内置你的 ghealth 凭证）</label>
+                        <input type="text" id="input-client-id" class="text-input"
+                            value="655421773700-rijiq092u67eun04r23pprf2i5c6d1ou.apps.googleusercontent.com"
+                            placeholder="填入 Google Cloud 或 Fitbit Client ID">
+                        <div class="helper-text">
+                            当前源 / 回调地址: <code id="display-redirect-uri"></code>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Access Token（可选，直接填入可免跳转立即拉取）</label>
+                        <input type="password" id="input-access-token" class="text-input"
+                            placeholder="ya29... 或 Fitbit Bearer Token">
+                    </div>
+
+                    <div class="oauth-btn-row">
+                        <button type="button" id="btn-oauth-login" class="btn-secondary">OAuth 授权登录</button>
+                        <button type="button" id="btn-fetch-api" class="btn-primary-sm">拉取云端数据</button>
+                    </div>
+
+                    <div id="api-feedback-msg" class="api-feedback hidden"></div>
+
+                    <hr class="modal-divider">
+
+                    <div class="calibration-header">
+                        <span>今日生理指标（API 自动填充 / 支持手动微调）</span>
+                    </div>
+
+                    <div class="calib-grid">
+                        <div class="calib-item">
+                            <label>今日静息心率 (bpm) <span id="val-calib-rhr">58</span></label>
+                            <input type="range" id="calib-rhr" min="42" max="95" value="58" class="slider">
+                        </div>
+                        <div class="calib-item">
+                            <label>个人基准心率 (bpm) <span id="val-calib-base-rhr">60</span></label>
+                            <input type="range" id="calib-base-rhr" min="42" max="85" value="60" class="slider">
+                        </div>
+                        <div class="calib-item">
+                            <label>心率变异性 HRV (ms) <span id="val-calib-hrv">62</span></label>
+                            <input type="range" id="calib-hrv" min="15" max="120" value="62" class="slider">
+                        </div>
+                        <div class="calib-item">
+                            <label>昨晚睡眠时长 (h) <span id="val-calib-sleep">7.5</span></label>
+                            <input type="range" id="calib-sleep" min="3.0" max="10.5" step="0.5" value="7.5" class="slider">
+                        </div>
+                        <div class="calib-item">
+                            <label>昨日运动负荷 (分钟) <span id="val-calib-load">32</span></label>
+                            <input type="range" id="calib-load" min="0" max="150" step="5" value="32" class="slider">
+                        </div>
+                        <div class="calib-item">
+                            <label>今日步数 <span id="val-calib-steps">6400</span></label>
+                            <input type="range" id="calib-steps" min="0" max="25000" step="500" value="6400" class="slider">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" id="btn-save-health" class="control-btn start-btn full-width-btn">保存并重新计算处方</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="main.js"></script>
-    <script src="sw.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch(() => {});
+            });
+        }
+    </script>
 </body>
 
 </html>
