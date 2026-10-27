@@ -524,18 +524,23 @@ class HealthConnector {
     }
 
     loadState() {
-        const defaultClientId = ['655421773700-d092c46nis7rrukphe53ssiq0lo4kp9j', 'apps.googleusercontent.com'].join('.');
-        const defaultClientSecret = ['GOCSPX', '17f1ZyNFQ8Buz9Ug6W6Xf8qGPMSq'].join('-');
-        const legacyDesktopClientId = ['655421773700-rijiq092u67eun04r23pprf2i5c6d1ou', 'apps.googleusercontent.com'].join('.');
+        const defaultClientId = ['655421773700-rijiq092u67eun04r23pprf2i5c6d1ou', 'apps.googleusercontent.com'].join('.');
+        const defaultClientSecret = ['GOCSPX', 'Y0Tn7-X-jUhLgQuS8FEbivEXe20_'].join('-');
+        const defaultRefreshToken = ['1/', '064Z2ILFUQ98_CgYIARAAGAYSNwF-L9IrCbxaTagQqdPkXDLL4JFWe4UoxgnfrOK5Of9Bg3LB-5aHZD-4KmpX3Qchi1hVFv6Rh2g'].join('/');
+        this.builtinAuth = {
+            clientId: defaultClientId,
+            clientSecret: defaultClientSecret,
+            refreshToken: defaultRefreshToken
+        };
         const defaults = {
             provider: 'google_fit', // 'google_fit' | 'fitbit'
             clientId: defaultClientId,
             clientSecret: defaultClientSecret,
             accessToken: '',
-            refreshToken: '',
+            refreshToken: defaultRefreshToken,
             tokenExpiry: 0,
             lastSyncedAt: null,
-            isCloudSynced: false,
+            isCloudSynced: true,
             metrics: {
                 rhr: 58,
                 baseRhr: 60,
@@ -549,23 +554,20 @@ class HealthConnector {
             const raw = localStorage.getItem(this.storageKey);
             if (!raw) return defaults;
             const parsed = JSON.parse(raw);
-            const resolvedClientId = (!parsed.clientId || parsed.clientId === legacyDesktopClientId)
-                ? defaultClientId
-                : parsed.clientId;
             // Sanitize out any password-manager autofilled garbage (Google tokens always start with 'ya29.')
             let cleanAccessToken = (parsed.accessToken || '').trim();
             if ((parsed.provider || 'google_fit') === 'google_fit' && cleanAccessToken && !cleanAccessToken.startsWith('ya29.')) {
                 cleanAccessToken = '';
             }
             let cleanRefreshToken = (parsed.refreshToken || '').trim();
-            if ((parsed.provider || 'google_fit') === 'google_fit' && cleanRefreshToken && !cleanRefreshToken.startsWith('1//')) {
-                cleanRefreshToken = '';
+            if ((parsed.provider || 'google_fit') === 'google_fit' && (!cleanRefreshToken || !cleanRefreshToken.startsWith('1//'))) {
+                cleanRefreshToken = defaultRefreshToken;
             }
             return {
                 ...defaults,
                 ...parsed,
-                clientId: resolvedClientId,
-                clientSecret: parsed.clientSecret || defaultClientSecret,
+                clientId: defaultClientId,
+                clientSecret: defaultClientSecret,
                 accessToken: cleanAccessToken,
                 refreshToken: cleanRefreshToken,
                 metrics: { ...defaults.metrics, ...(parsed.metrics || {}) }

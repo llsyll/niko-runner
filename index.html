@@ -9,7 +9,7 @@
     <meta name="description" content="超慢跑节拍器 & 计时助手">
     <meta name="theme-color" content="#000000">
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="style.css?v=7">
+    <link rel="stylesheet" href="style.css?v=8">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
@@ -340,11 +340,11 @@
         </div>
     </div>
 
-    <script src="main.js?v=7"></script>
+    <script src="main.js?v=8"></script>
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js?v=7').then(reg => {
+                navigator.serviceWorker.register('./sw.js?v=8').then(reg => {
                     reg.update();
                 }).catch(() => {});
             });
