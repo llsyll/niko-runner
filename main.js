@@ -95,6 +95,43 @@ class AudioController {
     playCountdownTick() {
         this.playTone(660, 0.06, 'sine');
     }
+
+    // Breathing / Tempo Cues for Strength Training (Eyes-Free Guidance)
+    // Soft low tone for eccentric/inhale phase (下放吸气)
+    playInhaleCue() {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(392, this.ctx.currentTime); // G4 gentle low
+        gain.gain.setValueAtTime(0.18, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.13);
+    }
+
+    // Crisp higher tone for concentric/exhale phase (发力呼气)
+    playExhaleCue() {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(523.25, this.ctx.currentTime); // C5 crisp
+        gain.gain.setValueAtTime(0.24, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.13);
+    }
+
+    // Subtle check-off chime
+    playCheckSound() {
+        this.playTone(784, 0.08, 'sine');
+        setTimeout(() => this.playTone(1046.5, 0.14, 'sine'), 80);
+    }
 }
 
 // --- Niko Mode Controller ---
@@ -251,6 +288,13 @@ class NikoController {
                 this.pause();
                 this.els.time.textContent = "DONE";
                 this.app.audio.playFinish();
+                if (this.app.strength && this.app.strength.health) {
+                    this.app.strength.health.recordWorkoutSession(
+                        `Niko 超慢跑 (${this.durationMinutes}分钟 · ${this.bpm} BPM)`,
+                        this.initialDurationSecs,
+                        56 // Jogging activityType in Google Fit
+                    );
+                }
             }
             return true; // returns true if 1 second tick happened
         }
@@ -495,6 +539,13 @@ class IntervalController {
                 // Ensure progress is full
                 this.elapsedTime = this.totalDuration;
                 this.updateTotalProgress();
+                if (this.app.strength && this.app.strength.health) {
+                    this.app.strength.health.recordWorkoutSession(
+                        `Niko 间歇训练 (${this.totalSets}组)`,
+                        this.totalDuration,
+                        114 // HIIT activityType in Google Fit
+                    );
+                }
                 return;
             } else {
                 // Rest Time
@@ -979,10 +1030,162 @@ class HealthConnector {
         this.saveState();
         return this.state.metrics;
     }
+
+    // Write completed workout session back to Google Fit (activityType: 80 = Strength Training, 56 = Jogging, 114 = HIIT)
+    async recordWorkoutSession(name, durationSecs, activityType = 80) {
+        if (!durationSecs || durationSecs < 10) return;
+        const mins = Math.max(1, Math.round(durationSecs / 60));
+
+        // Update local load minutes so readiness reflects today's effort
+        this.state.metrics.yesterdayLoadMins = (this.state.metrics.yesterdayLoadMins || 0) + mins;
+        this.saveState();
+
+        if (this.state.provider !== 'google_fit' || !this.hasPermanentAuth()) return;
+        try {
+            if (!this.state.accessToken || (this.state.tokenExpiry && Date.now() > this.state.tokenExpiry - 120000)) {
+                await this.refreshAccessToken();
+            }
+            const token = (this.state.accessToken || '').trim();
+            if (!token) return;
+
+            const endTimeMillis = Date.now();
+            const startTimeMillis = endTimeMillis - (durationSecs * 1000);
+            const sessionId = `niko-workout-${endTimeMillis}`;
+
+            await fetch(`https://www.googleapis.com/fitness/v1/users/me/sessions/${sessionId}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    id: sessionId,
+                    name,
+                    description: '由 Niko 科学超慢跑与力量训练助手记录',
+                    startTimeMillis,
+                    endTimeMillis,
+                    activityType,
+                    application: {
+                        name: 'Niko Runner & Strength'
+                    }
+                })
+            });
+        } catch (err) {
+            console.warn('Google Fit workout session writeback skipped:', err);
+        }
+    }
 }
 
 // --- Pure Sports Science Prescription Engine (Local, Zero-Latency) ---
 class SportsScienceEngine {
+    static getExerciseSvg(svgType) {
+        const strokeLime = '#befb46';
+        const strokeWhite = '#ffffff';
+        const strokeMuted = 'rgba(255,255,255,0.25)';
+
+        switch (svgType) {
+            case 'squat':
+                return `<svg viewBox="0 0 220 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <line x1="25" y1="104" x2="195" y2="104" stroke="${strokeMuted}" stroke-width="2" stroke-dasharray="4 4"/>
+                    <!-- Standing ghost -->
+                    <circle cx="95" cy="24" r="7" stroke="${strokeMuted}" stroke-width="2"/>
+                    <path d="M95 32 L95 64 L95 102" stroke="${strokeMuted}" stroke-width="2" stroke-linecap="round"/>
+                    <!-- Active Squat Figure -->
+                    <circle cx="118" cy="36" r="8" stroke="${strokeLime}" stroke-width="2.5"/>
+                    <!-- Torso leaning slightly forward with straight spine -->
+                    <line x1="114" y1="44" x2="88" y2="72" stroke="${strokeLime}" stroke-width="3.5" stroke-linecap="round"/>
+                    <!-- Arms forward for balance -->
+                    <line x1="108" y1="50" x2="146" y2="50" stroke="${strokeWhite}" stroke-width="2.5" stroke-linecap="round"/>
+                    <!-- Thigh parallel to ground -->
+                    <line x1="88" y1="72" x2="124" y2="74" stroke="${strokeLime}" stroke-width="3.5" stroke-linecap="round"/>
+                    <!-- Shin vertical -->
+                    <line x1="124" y1="74" x2="128" y2="102" stroke="${strokeLime}" stroke-width="3.5" stroke-linecap="round"/>
+                    <line x1="124" y1="102" x2="138" y2="102" stroke="${strokeWhite}" stroke-width="3" stroke-linecap="round"/>
+                    <!-- Hip back arrow -->
+                    <path d="M76 68 L62 68 M62 68 L67 63 M62 68 L67 73" stroke="${strokeWhite}" stroke-width="1.8" stroke-linecap="round"/>
+                    <text x="34" y="62" fill="${strokeWhite}" font-size="9" opacity="0.85">臀向后坐</text>
+                    <text x="142" y="88" fill="${strokeLime}" font-size="9" font-weight="bold">膝对脚尖</text>
+                </svg>`;
+            case 'pushup':
+                return `<svg viewBox="0 0 220 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <line x1="20" y1="98" x2="200" y2="98" stroke="${strokeMuted}" stroke-width="2" stroke-dasharray="4 4"/>
+                    <!-- High plank ghost -->
+                    <line x1="48" y1="96" x2="152" y2="48" stroke="${strokeMuted}" stroke-width="2" stroke-dasharray="3 3"/>
+                    <!-- Active Pushup Body (Straight line head-hip-heel) -->
+                    <circle cx="166" cy="58" r="7.5" stroke="${strokeLime}" stroke-width="2.5"/>
+                    <line x1="46" y1="96" x2="156" y2="62" stroke="${strokeLime}" stroke-width="3.5" stroke-linecap="round"/>
+                    <!-- Arm bent at 45 deg -->
+                    <polyline points="142,66 132,82 144,96" stroke="${strokeWhite}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                    <!-- Feet -->
+                    <line x1="46" y1="96" x2="42" y2="88" stroke="${strokeWhite}" stroke-width="3" stroke-linecap="round"/>
+                    <text x="64" y="54" fill="${strokeLime}" font-size="9" font-weight="bold">头·肩·臀·踵呈一直线</text>
+                    <text x="148" y="88" fill="${strokeWhite}" font-size="9" opacity="0.85">肘内收45°</text>
+                </svg>`;
+            case 'bridge':
+                return `<svg viewBox="0 0 220 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <line x1="20" y1="98" x2="200" y2="98" stroke="${strokeMuted}" stroke-width="2" stroke-dasharray="4 4"/>
+                    <!-- Head & Upper Back on mat -->
+                    <circle cx="48" cy="90" r="7" stroke="${strokeWhite}" stroke-width="2.2"/>
+                    <line x1="56" y1="94" x2="74" y2="94" stroke="${strokeWhite}" stroke-width="3.5" stroke-linecap="round"/>
+                    <!-- Lifted Torso + Hips + Thighs in straight diagonal -->
+                    <line x1="74" y1="94" x2="118" y2="64" stroke="${strokeLime}" stroke-width="3.8" stroke-linecap="round"/>
+                    <line x1="118" y1="64" x2="152" y2="48" stroke="${strokeLime}" stroke-width="3.8" stroke-linecap="round"/>
+                    <!-- Shin down to heel -->
+                    <line x1="152" y1="48" x2="162" y2="96" stroke="${strokeLime}" stroke-width="3.5" stroke-linecap="round"/>
+                    <line x1="158" y1="96" x2="172" y2="96" stroke="${strokeWhite}" stroke-width="3" stroke-linecap="round"/>
+                    <!-- Upward hip drive arrow -->
+                    <path d="M118 84 L118 70 M118 70 L113 75 M118 70 L123 75" stroke="${strokeLime}" stroke-width="2" stroke-linecap="round"/>
+                    <text x="86" y="46" fill="${strokeLime}" font-size="9" font-weight="bold">夹紧臀部顶起 · 停顿2秒</text>
+                </svg>`;
+            case 'back_w':
+                return `<svg viewBox="0 0 220 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <line x1="20" y1="96" x2="200" y2="96" stroke="${strokeMuted}" stroke-width="2" stroke-dasharray="4 4"/>
+                    <!-- Prone body on mat, upper chest slightly lifted -->
+                    <line x1="42" y1="92" x2="112" y2="92" stroke="${strokeWhite}" stroke-width="3.2" stroke-linecap="round"/>
+                    <line x1="112" y1="92" x2="154" y2="74" stroke="${strokeLime}" stroke-width="3.6" stroke-linecap="round"/>
+                    <circle cx="164" cy="69" r="7" stroke="${strokeLime}" stroke-width="2.5"/>
+                    <!-- W-shaped bent arm -->
+                    <polyline points="142,79 124,62 146,52" stroke="${strokeWhite}" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M124 56 L124 42 M124 42 L119 47 M124 42 L129 47" stroke="${strokeLime}" stroke-width="2" stroke-linecap="round"/>
+                    <text x="58" y="54" fill="${strokeLime}" font-size="9" font-weight="bold">双臂呈W型 · 夹紧后背肩胛骨</text>
+                </svg>`;
+            case 'plank':
+                return `<svg viewBox="0 0 220 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <line x1="20" y1="98" x2="200" y2="98" stroke="${strokeMuted}" stroke-width="2" stroke-dasharray="4 4"/>
+                    <!-- Straight rigid body line -->
+                    <circle cx="166" cy="64" r="7.5" stroke="${strokeLime}" stroke-width="2.5"/>
+                    <line x1="46" y1="94" x2="155" y2="68" stroke="${strokeLime}" stroke-width="4" stroke-linecap="round"/>
+                    <!-- Forearm perpendicular on floor -->
+                    <polyline points="146,70 146,95 164,95" stroke="${strokeWhite}" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <!-- Toes on floor -->
+                    <line x1="46" y1="94" x2="44" y2="85" stroke="${strokeWhite}" stroke-width="3" stroke-linecap="round"/>
+                    <text x="62" y="52" fill="${strokeLime}" font-size="9" font-weight="bold">收腹夹臀 · 身体如钢板不塌腰</text>
+                </svg>`;
+            case 'lunge':
+                return `<svg viewBox="0 0 220 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <line x1="20" y1="104" x2="200" y2="104" stroke="${strokeMuted}" stroke-width="2" stroke-dasharray="4 4"/>
+                    <circle cx="112" cy="26" r="7.5" stroke="${strokeLime}" stroke-width="2.5"/>
+                    <line x1="112" y1="34" x2="112" y2="68" stroke="${strokeLime}" stroke-width="3.5" stroke-linecap="round"/>
+                    <!-- Front leg 90 deg -->
+                    <polyline points="112,68 142,68 142,102" stroke="${strokeLime}" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <!-- Back leg 90 deg -->
+                    <polyline points="112,68 84,96 62,96" stroke="${strokeWhite}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                    <text x="132" y="54" fill="${strokeLime}" font-size="9" font-weight="bold">前后膝均约 90°</text>
+                </svg>`;
+            default:
+                return `<svg viewBox="0 0 220 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <line x1="20" y1="98" x2="200" y2="98" stroke="${strokeMuted}" stroke-width="2" stroke-dasharray="4 4"/>
+                    <circle cx="62" cy="88" r="7.5" stroke="${strokeLime}" stroke-width="2.5"/>
+                    <line x1="72" y1="92" x2="132" y2="92" stroke="${strokeLime}" stroke-width="4" stroke-linecap="round"/>
+                    <!-- Raised legs 90 deg tabletop -->
+                    <polyline points="132,92 132,60 162,60" stroke="${strokeLime}" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <!-- Raised arms -->
+                    <line x1="86" y1="90" x2="86" y2="54" stroke="${strokeWhite}" stroke-width="2.8" stroke-linecap="round"/>
+                    <text x="75" y="42" fill="${strokeLime}" font-size="9" font-weight="bold">后腰死死贴紧垫面 · 对侧慢放</text>
+                </svg>`;
+        }
+    }
+
     static getExerciseDatabase() {
         return [
             // Push (Upper Body Anterior)
@@ -994,7 +1197,13 @@ class SportsScienceEngine {
                 tier: [2, 3],
                 baseWork: 40,
                 baseRest: 30,
-                repHint: '10-15 次 · 吸气慢下3秒，呼气推起，手肘微收45°不耸肩'
+                isStatic: false,
+                svgType: 'pushup',
+                repHint: '10-15 次 · 吸气慢下2秒，呼气推起，手肘微收45°不耸肩',
+                setup: '双手撑地略宽于肩，手指自然张开抓地；双脚并拢或与髋同宽，头、肩、臀、脚后跟呈一条笔直斜线。',
+                exec: '【吸气】控制身体缓慢下放 2 秒，手肘向身体斜后方（约 45° 夹角）弯曲；【呼气】胸部与手臂同时发力推回起始位。',
+                mistake: '切忌塌腰撅屁股、切忌脖子前伸耸肩、切忌手肘向外撇成 90°（T字型易伤肩关节）。如果做到后半程动作变形，立即双膝跪地完成剩余次数。',
+                why: '俯卧撑是徒手推力之王，能同时强化胸大肌、三角肌前束、肱三头肌与前侧核心，让你超慢跑时上半身摆臂更稳健挺拔。'
             },
             {
                 id: 'pushup_tempo',
@@ -1004,7 +1213,13 @@ class SportsScienceEngine {
                 tier: [3],
                 baseWork: 45,
                 baseRest: 35,
-                repHint: '8-12 次 · 下放3秒，底部停顿1秒有力推起'
+                isStatic: false,
+                svgType: 'pushup',
+                repHint: '8-12 次 · 下放3秒，底部停顿1秒有力推起',
+                setup: '同标准俯卧撑姿势，双手撑地略宽于肩，收紧腹臀，全身绷紧如一块钢板。',
+                exec: '【吸气】默数 3-2-1 匀速缓慢下放至胸口离地一拳；底部停顿 1 秒；【呼气】爆发力快速推起。',
+                mistake: '下放时不要憋气，更不要腰部先塌下去。',
+                why: '慢速离心下放能用更少的次数带来更强的肌纤维微刺激与肌腱韧性提升，是徒手突破力量平台期的最佳手段。'
             },
             {
                 id: 'pushup_incline',
@@ -1014,7 +1229,13 @@ class SportsScienceEngine {
                 tier: [1, 2],
                 baseWork: 35,
                 baseRest: 25,
-                repHint: '10-15 次 · 双膝着地或双手扶稳桌面，保持腰背平直'
+                isStatic: false,
+                svgType: 'pushup',
+                repHint: '10-15 次 · 双膝着地或双手扶稳桌面，保持腰背平直',
+                setup: '双手撑在稳固沙发沿/桌面（上斜）或双膝垫软垫着地（跪姿），从头顶到膝盖保持一条直线。',
+                exec: '【吸气】屈肘慢下 2 秒，感受胸肌拉伸；【呼气】平稳推起，全程沉肩收腹。',
+                mistake: '膝盖着地时不要撅臀成四角爬行状，髋部要向前送与躯干齐平。',
+                why: '在恢复日或初学阶段，降低约 35% 的关节负荷，让你能把 100% 注意力放在标准的肩胛与胸肌发力轨迹上。'
             },
             {
                 id: 'shoulder_tap',
@@ -1024,7 +1245,13 @@ class SportsScienceEngine {
                 tier: [2, 3],
                 baseWork: 40,
                 baseRest: 25,
-                repHint: '16-20 次 · 双脚略宽，抬手摸对侧肩时骨盆不左右晃'
+                isStatic: false,
+                svgType: 'pushup',
+                repHint: '16-20 次 · 双脚略宽，抬手摸对侧肩时骨盆不左右晃',
+                setup: '高平板支撑姿势（双手在肩正下方撑直），双脚分开比肩略宽以提供稳定底座。',
+                exec: '保持呼吸均匀，缓慢抬起右手轻触左肩，放回后再抬左手触右肩。想象后背放了一杯水不能洒。',
+                mistake: '动作太快导致屁股左右大幅摇摆。宁可慢一半，也要稳住骨盆。',
+                why: '强化单侧肩袖稳定与腹内外斜肌「抗旋转」能力，预防跑步后半程骨盆左右掉胯。'
             },
             // Lower Body (Squat / Lunge / Glute Hinge)
             {
@@ -1035,7 +1262,13 @@ class SportsScienceEngine {
                 tier: [2, 3],
                 baseWork: 45,
                 baseRest: 30,
-                repHint: '15-20 次 · 吸气臀部向后坐，膝盖对准脚尖不内扣'
+                isStatic: false,
+                svgType: 'squat',
+                repHint: '12-18 次 · 吸气臀部向后坐，膝盖对准脚尖不内扣',
+                setup: '双脚分开与肩同宽或略宽，脚尖自然向外微展 15°-30°，抬头挺胸，双手前平举保持平衡。',
+                exec: '【吸气】像身后有一把椅子一样，先屈髋臀部向后坐，再屈膝下蹲至大腿接近平行地面；【呼气】全脚掌（尤其脚后跟与大脚趾根）踩实地面起身。',
+                mistake: '切忌膝盖向内扣（内八字）、切忌脚后跟抬起重心全压在膝盖前侧、切忌低头弓背。',
+                why: '下肢力量之本！强化股四头肌与臀肌，能显著吸收超慢跑每一步的落地冲击力，是保护膝关节的头号动作。'
             },
             {
                 id: 'split_squat',
@@ -1045,7 +1278,13 @@ class SportsScienceEngine {
                 tier: [2, 3],
                 baseWork: 45,
                 baseRest: 30,
-                repHint: '每侧 8-10 次 · 向后退一步下蹲，前脚全脚掌踩实地面发力'
+                isStatic: false,
+                svgType: 'lunge',
+                repHint: '每侧 8-10 次 · 向后退一步下蹲，前脚全脚掌踩实地面发力',
+                setup: '自然站立，双手叉腰或胸前抱拳，目光平视前方。',
+                exec: '【吸气】右脚向后撤一大步，顺势下蹲至前后膝盖均约呈 90°；【呼气】靠前侧腿（左腿）臀部和大腿发力蹬地回到站立，左右交替。',
+                mistake: '前侧膝盖不要向内扣，身体不要过度前趴。后撤步比前跨步对膝关节剪切力小得多、更安全。',
+                why: '跑步本质上是成千上万次「单腿交替支撑」。加入单腿练习能纠正左右腿力量不均，大幅提升跑步稳定性。'
             },
             {
                 id: 'squat_pulse',
@@ -1055,7 +1294,13 @@ class SportsScienceEngine {
                 tier: [3],
                 baseWork: 45,
                 baseRest: 35,
-                repHint: '12-15 次 · 起身时顺势踮起脚尖，强化超慢跑足踝弹性'
+                isStatic: false,
+                svgType: 'squat',
+                repHint: '12-15 次 · 起身时顺势踮起脚尖，强化超慢跑足踝弹性',
+                setup: '标准深蹲站姿，双脚与肩同宽。',
+                exec: '【吸气】下蹲到底部后上下小幅脉动 1 次；【呼气】站起并在顶端顺势踮起脚尖（提踵）停顿 1 秒。',
+                mistake: '提踵时脚踝不要向外崴，大脚趾球踩稳地面。',
+                why: '专门针对「Niko 超慢跑」前脚掌微落地技术设计，同时强化大腿缓冲与小腿比目鱼肌/跟腱弹性。'
             },
             {
                 id: 'glute_bridge',
@@ -1065,7 +1310,13 @@ class SportsScienceEngine {
                 tier: [1, 2, 3],
                 baseWork: 40,
                 baseRest: 20,
-                repHint: '12-16 次 · 仰卧屈膝，用臀部发力顶起髋部，顶部夹紧2秒'
+                isStatic: false,
+                svgType: 'bridge',
+                repHint: '12-16 次 · 仰卧屈膝，用臀部发力顶起髋部，顶部夹紧2秒',
+                setup: '仰卧在瑜伽垫或床垫上，双膝弯曲，脚后跟离臀部约一掌距离，双脚与髋同宽，双手自然放身体两侧。',
+                exec: '【呼气】脚后跟踩地，用臀部发力将髋部向上顶起，直到肩、髋、膝呈一条直线，在最高点用力夹紧臀部停顿 2 秒；【吸气】缓慢下放但臀部轻触垫面即起。',
+                mistake: '不要用腰使劲往上拱成拱桥（如果腰酸说明顶太高了，收一点肋骨，专注夹紧屁股）。',
+                why: '为什么必加它？只练深蹲只练到了大腿前侧，久坐族往往「臀肌失忆」。激活臀大肌和腘绳肌能平衡膝关节前后拉力，跑起来更有推进力且不伤膝！'
             },
             {
                 id: 'wall_sit',
@@ -1075,7 +1326,13 @@ class SportsScienceEngine {
                 tier: [1, 2],
                 baseWork: 40,
                 baseRest: 25,
-                repHint: '保持静态 · 后背贴墙，小腿垂直地面，感受大腿前侧发热'
+                isStatic: true,
+                svgType: 'squat',
+                repHint: '保持静态 · 后背贴墙，小腿垂直地面，感受大腿前侧发热',
+                setup: '后背、臀部平贴墙面，双脚向前迈出一步（与肩同宽），顺着墙壁下滑。',
+                exec: '大腿与小腿呈 90°-110° 夹角（膝盖绝对不超过脚尖，小腿垂直地面），全程保持深长均匀呼吸。',
+                mistake: '切勿憋气，膝盖不要内扣，双手不要撑在大腿上借力。觉得太酸可稍微蹲高一点（110°）。',
+                why: '运动康复界公认的「护膝黄金动作」，在零关节摩擦的前提下温和强化髌骨周围肌群与韧带。'
             },
             // Core & Back Postural Balance
             {
@@ -1084,9 +1341,15 @@ class SportsScienceEngine {
                 category: 'core',
                 muscle: '保留核心 · 腹横肌/静态核心',
                 tier: [2, 3],
-                baseWork: 45,
+                baseWork: 40,
                 baseRest: 25,
-                repHint: '保持静态 · 手肘在肩正下方，收腹夹臀不塌腰，均匀呼吸'
+                isStatic: true,
+                svgType: 'plank',
+                repHint: '保持静态 · 手肘在肩正下方，收腹夹臀不塌腰，均匀呼吸',
+                setup: '俯卧，双肘弯曲支撑在地面上，手肘必须在肩膀正下方，前臂平行，双脚踩地。',
+                exec: '肚脐向脊柱方向收紧（像有人要轻捶你肚子），同时夹紧臀部、大腿绷直，全程均匀深呼吸。',
+                mistake: '最忌讳「塌腰」导致下背部挤压疼痛！一旦感觉腰酸而不是肚子酸，立即把屁股微微抬高一点或休息。切勿憋气！',
+                why: '铸造躯干「紧身衣」（腹横肌），让你在超慢跑和日常生活中维持脊柱中立，告别跑后腰酸。'
             },
             {
                 id: 'dead_bug',
@@ -1096,7 +1359,13 @@ class SportsScienceEngine {
                 tier: [1, 2, 3],
                 baseWork: 40,
                 baseRest: 20,
-                repHint: '交替 12-16 次 · 仰卧抬手脚，对侧手脚慢放，后腰死死贴紧地面'
+                isStatic: false,
+                svgType: 'default',
+                repHint: '交替 12-16 次 · 仰卧抬手脚，对侧手脚慢放，后腰死死贴紧地面',
+                setup: '仰卧，双手伸直指向天花板，双腿屈膝抬起呈 90°（小腿平行地面），最关键：用力收腹把后腰死死贴紧垫面，不留一丝空隙。',
+                exec: '【呼气】缓慢将「右手 + 左腿」同时向地面方向伸展下放（悬空不落地）；【吸气】回到中间，换「左手 + 右腿」交替。',
+                mistake: '手脚下放时后腰拱起离开地面。如果腰贴不住，腿不要放太低，往斜上方蹬即可。',
+                why: '平板支撑是静态核心，而跑步是手脚交替的动态过程。死虫式能安全教会你的核心在四肢摆动时锁死腰椎。'
             },
             {
                 id: 'bird_dog',
@@ -1106,7 +1375,13 @@ class SportsScienceEngine {
                 tier: [1, 2],
                 baseWork: 40,
                 baseRest: 20,
-                repHint: '交替 10-12 次 · 四足跪姿，伸出左手右脚呈水平线，停顿1秒换边'
+                isStatic: false,
+                svgType: 'default',
+                repHint: '交替 10-12 次 · 四足跪姿，伸出左手右脚呈水平线，停顿1秒换边',
+                setup: '四足跪姿在垫上，双手在肩正下方，双膝在髋正下方，背部平直像一张桌子。',
+                exec: '【呼气】同时向前伸直左臂、向后蹬直右腿，直到与背部呈一条水平线，停顿 1 秒；【吸气】收回换对侧。',
+                mistake: '后蹬腿不需要抬太高，抬太高会导致塌腰；重点是手指往前够、脚跟往后蹬的延展感。',
+                why: '温和激活脊柱深层多裂肌与臀部，极佳的跑前激活与疲劳日腰背养护动作。'
             },
             {
                 id: 'superman_y',
@@ -1116,7 +1391,13 @@ class SportsScienceEngine {
                 tier: [1, 2, 3],
                 baseWork: 40,
                 baseRest: 20,
-                repHint: '12-15 次 · 趴在垫上，双臂屈肘呈W型向上抬起，夹紧后背肩胛骨'
+                isStatic: false,
+                svgType: 'back_w',
+                repHint: '12-15 次 · 趴在垫上，双臂屈肘呈W型向上抬起，夹紧后背肩胛骨',
+                setup: '俯卧趴在垫上，脚背贴地，收紧臀部保护下腰，额头轻轻点地，双臂向两侧屈肘呈英文字母「W」字型。',
+                exec: '【呼气】上胸与双臂微微抬离地面，手肘向后背中间用力夹紧肩胛骨，在最高点停顿 2 秒；【吸气】缓慢下放。',
+                mistake: '不要拼命仰脖子看前面（眼睛始终看垫子，保持颈椎自然延长），不要用腰猛烈反弓。',
+                why: '为什么必加它？只练俯卧撑不练背，胸肌紧、背部弱会导致圆肩驼背。这个动作专门强化菱形肌与中下斜方肌，帮你打开胸腔，让超慢跑呼吸更顺畅！'
             },
             {
                 id: 'cat_cow_hip',
@@ -1126,7 +1407,13 @@ class SportsScienceEngine {
                 tier: [1],
                 baseWork: 40,
                 baseRest: 15,
-                repHint: '缓慢深呼吸 · 吸气抬头塌腰延展，呼气低头拱背放松腰椎'
+                isStatic: false,
+                svgType: 'default',
+                repHint: '缓慢深呼吸 · 吸气抬头塌腰延展，呼气低头拱背放松腰椎',
+                setup: '四足跪姿，手腕在肩正下方，膝盖在髋正下方。',
+                exec: '【吸气】尾骨向上翘，腹部温柔下沉，微抬头打开胸腔（牛式）；【呼气】尾骨内卷，像猫咪伸懒腰一样把背部高高拱起（猫式）。',
+                mistake: '动作配合深呼吸柔和缓慢进行，不要憋气或猛烈甩头。',
+                why: '释放久坐或跑步后的脊柱压力，促进椎间盘营养液交换与副交感神经恢复。'
             }
         ];
     }
@@ -1240,7 +1527,7 @@ class SportsScienceEngine {
         };
     }
 
-    static generateWorkoutPlan(metrics, focusMode = 'golden') {
+    static generateWorkoutPlan(metrics, focusMode = 'golden', setsOverride = 'auto') {
         const evalResult = this.evaluateReadiness(metrics);
         const db = this.getExerciseDatabase();
 
@@ -1259,7 +1546,7 @@ class SportsScienceEngine {
             selectedIds = ['squat_bw', pushId, 'plank_std'];
         } else if (effectiveFocus === 'golden') {
             // 3+2 Golden Balanced Formula:
-            // Keeps Squat + Push-up + Plank, adds Glute Bridge/Split Squat (posterior chain & knee protection) + Prone W (upper back posture)
+            // Keeps Squat + Push-up + Plank, adds Glute Bridge (posterior chain & knee protection) + Prone W (upper back posture)
             if (evalResult.tierLevel === 3) {
                 selectedIds = ['squat_bw', 'pushup_std', 'glute_bridge', 'superman_y', 'plank_std'];
             } else if (evalResult.tierKey === 'moderate' || evalResult.tierKey === 'recovery') {
@@ -1281,9 +1568,13 @@ class SportsScienceEngine {
             selectedIds = ['squat_bw', 'pushup_std', 'glute_bridge', 'superman_y', 'plank_std'];
         }
 
+        const customSets = (setsOverride !== 'auto' && Number(setsOverride) >= 1)
+            ? Number(setsOverride)
+            : evalResult.setsMultiplier;
+
         const exercises = selectedIds.map(id => {
             const item = db.find(e => e.id === id) || db[0];
-            const sets = evalResult.setsMultiplier;
+            const sets = customSets;
             const workSecs = Math.max(25, item.baseWork + evalResult.workOffset);
             const restSecs = Math.max(15, item.baseRest + evalResult.restOffset);
             return {
@@ -1299,7 +1590,7 @@ class SportsScienceEngine {
         exercises.forEach(ex => {
             totalSecs += ex.sets * (ex.workSecs + ex.restSecs);
         });
-        const estMinutes = Math.max(5, Math.round(totalSecs / 60));
+        const estMinutes = Math.max(4, Math.round(totalSecs / 60));
 
         return {
             readiness: evalResult,
@@ -1317,11 +1608,16 @@ class StrengthController {
         this.app = app;
         this.health = new HealthConnector();
         this.focusMode = 'golden';
+        this.setsOverride = 'auto';
         this.currentPlan = null;
+
+        // Track completed exercises for today (persisted per calendar day)
+        this.completedToday = this.loadTodayCompleted();
+        this.activeGuideExIndex = null;
 
         // Guided Workout Player State
         this.isRunning = false;
-        this.timeline = []; // Flattened steps: { type: 'prep'|'work'|'rest', duration, exIndex, exName, setNum, totalSets, cue, nextLabel }
+        this.timeline = []; // Flattened steps: { type: 'prep'|'work'|'rest', duration, exIndex, exId, exName, isStatic, setNum, totalSets, isLastSetOfEx, cue, nextLabel }
         this.stepIndex = 0;
         this.timeLeft = 0;
         this.elapsedTotal = 0;
@@ -1346,7 +1642,9 @@ class StrengthController {
             vitalLoad: document.getElementById('vital-load'),
 
             focusChips: document.querySelectorAll('#strength-focus-chips .chip-xs'),
+            setsChips: document.querySelectorAll('#sets-override-chips .chip-mini'),
             planHeaderTitle: document.getElementById('plan-header-title'),
+            planProgressBadge: document.getElementById('plan-progress-badge'),
             planTotalEst: document.getElementById('plan-total-est'),
             planList: document.getElementById('strength-plan-list'),
 
@@ -1356,6 +1654,7 @@ class StrengthController {
             // Player Elements
             playerPanel: document.getElementById('strength-player-panel'),
             phaseBadge: document.getElementById('str-phase-badge'),
+            rhythmPill: document.getElementById('str-rhythm-pill'),
             progressMeta: document.getElementById('str-progress-meta'),
             currentExName: document.getElementById('str-current-ex-name'),
             currentExTarget: document.getElementById('str-current-ex-target'),
@@ -1369,7 +1668,21 @@ class StrengthController {
             bottomBar: document.getElementById('strength-bottom-bar'),
             startWorkoutBtn: document.getElementById('str-start-workout-btn'),
 
-            // Modal Elements
+            // Exercise Guide Modal Elements
+            guideModal: document.getElementById('ex-guide-modal'),
+            btnCloseGuide: document.getElementById('btn-close-guide'),
+            guideTitle: document.getElementById('guide-ex-title'),
+            guideMuscleTag: document.getElementById('guide-ex-muscle-tag'),
+            guideVolumeTag: document.getElementById('guide-ex-volume-tag'),
+            guideSvgStage: document.getElementById('guide-svg-stage'),
+            guideSetup: document.getElementById('guide-step-setup'),
+            guideExec: document.getElementById('guide-step-exec'),
+            guideMistake: document.getElementById('guide-step-mistake'),
+            guideWhy: document.getElementById('guide-step-why'),
+            btnGuideCheck: document.getElementById('btn-guide-check'),
+            btnGuidePlay: document.getElementById('btn-guide-play'),
+
+            // Health Config Modal Elements
             modal: document.getElementById('health-modal'),
             btnCloseModal: document.getElementById('btn-close-modal'),
             providerBtns: document.querySelectorAll('#provider-switch .chip-xs'),
@@ -1400,6 +1713,57 @@ class StrengthController {
         this.refreshPrescription();
     }
 
+    getTodayDateKey() {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    loadTodayCompleted() {
+        try {
+            const raw = localStorage.getItem('niko_strength_done_v1');
+            if (!raw) return new Set();
+            const parsed = JSON.parse(raw);
+            if (parsed.date === this.getTodayDateKey() && Array.isArray(parsed.ids)) {
+                return new Set(parsed.ids);
+            }
+            return new Set();
+        } catch (e) {
+            return new Set();
+        }
+    }
+
+    saveTodayCompleted() {
+        try {
+            localStorage.setItem('niko_strength_done_v1', JSON.stringify({
+                date: this.getTodayDateKey(),
+                ids: Array.from(this.completedToday)
+            }));
+        } catch (e) {
+            console.warn(e);
+        }
+    }
+
+    toggleExerciseCompleted(ex, playSound = true) {
+        if (!ex) return;
+        const wasDone = this.completedToday.has(ex.id);
+        if (wasDone) {
+            this.completedToday.delete(ex.id);
+        } else {
+            this.completedToday.add(ex.id);
+            if (playSound) {
+                this.app.requestAudio().then(() => this.app.audio.playCheckSound());
+            }
+            // Write single exercise completion to Google Fit
+            this.health.recordWorkoutSession(
+                `科学力量：${ex.name} (${ex.sets}组)`,
+                ex.sets * (ex.workSecs + ex.restSecs),
+                80
+            );
+        }
+        this.saveTodayCompleted();
+        this.updateCompletionUI();
+    }
+
     initEvents() {
         // Focus Chips
         this.els.focusChips.forEach(chip => {
@@ -1410,7 +1774,43 @@ class StrengthController {
             });
         });
 
-        // Open/Close Modal
+        // Quick Sets / Volume Switcher Chips (智能 / 2组 / 3组 / 4组)
+        this.els.setsChips.forEach(chip => {
+            chip.addEventListener('click', () => {
+                this.setsOverride = chip.dataset.sets;
+                this.els.setsChips.forEach(c => c.classList.toggle('active', c === chip));
+                this.refreshPrescription();
+            });
+        });
+
+        // Exercise Guide Modal Events
+        if (this.els.btnCloseGuide) {
+            this.els.btnCloseGuide.addEventListener('click', () => this.closeExerciseGuide());
+        }
+        if (this.els.guideModal) {
+            this.els.guideModal.addEventListener('click', (e) => {
+                if (e.target === this.els.guideModal) this.closeExerciseGuide();
+            });
+        }
+        if (this.els.btnGuideCheck) {
+            this.els.btnGuideCheck.addEventListener('click', () => {
+                if (this.activeGuideExIndex === null || !this.currentPlan) return;
+                const ex = this.currentPlan.exercises[this.activeGuideExIndex];
+                this.toggleExerciseCompleted(ex, true);
+                this.closeExerciseGuide();
+            });
+        }
+        if (this.els.btnGuidePlay) {
+            this.els.btnGuidePlay.addEventListener('click', () => {
+                const idx = this.activeGuideExIndex;
+                this.closeExerciseGuide();
+                if (idx !== null) {
+                    this.startGuidedWorkout(idx);
+                }
+            });
+        }
+
+        // Open/Close Health Modal
         this.els.btnHealthConfig.addEventListener('click', () => this.openModal());
         this.els.btnCloseModal.addEventListener('click', () => this.closeModal());
         this.els.modal.addEventListener('click', (e) => {
@@ -1506,10 +1906,38 @@ class StrengthController {
         });
 
         // Workout Player Controls
-        this.els.startWorkoutBtn.addEventListener('click', () => this.startGuidedWorkout());
+        this.els.startWorkoutBtn.addEventListener('click', () => this.startGuidedWorkout(null));
         this.els.pauseBtn.addEventListener('click', () => this.togglePause());
         this.els.skipBtn.addEventListener('click', () => this.skipCurrentStep());
         this.els.stopBtn.addEventListener('click', () => this.stop());
+    }
+
+    openExerciseGuide(exIdx) {
+        if (!this.currentPlan || !this.currentPlan.exercises[exIdx]) return;
+        this.activeGuideExIndex = exIdx;
+        const ex = this.currentPlan.exercises[exIdx];
+        const isDone = this.completedToday.has(ex.id);
+
+        this.els.guideTitle.textContent = ex.name;
+        this.els.guideMuscleTag.textContent = ex.muscle;
+        this.els.guideVolumeTag.textContent = `今日处方：${ex.sets} 组 × ${ex.workSecs}秒 (组间休 ${ex.restSecs}秒)`;
+        this.els.guideSvgStage.innerHTML = SportsScienceEngine.getExerciseSvg(ex.svgType);
+        this.els.guideSetup.textContent = ex.setup || '';
+        this.els.guideExec.textContent = ex.exec || ex.repHint;
+        this.els.guideMistake.textContent = ex.mistake || '';
+        this.els.guideWhy.textContent = ex.why || '';
+
+        this.els.btnGuideCheck.textContent = isDone ? '取消打勾' : '✓ 直接打勾完成';
+        this.els.btnGuidePlay.textContent = `⏱ 单独跟练此动作 (${ex.sets}组)`;
+
+        this.els.guideModal.classList.remove('hidden');
+    }
+
+    closeExerciseGuide() {
+        if (this.els.guideModal) {
+            this.els.guideModal.classList.add('hidden');
+        }
+        this.activeGuideExIndex = null;
     }
 
     openModal() {
@@ -1569,9 +1997,45 @@ class StrengthController {
         }
     }
 
+    updateCompletionUI() {
+        if (!this.currentPlan) return;
+        const exercises = this.currentPlan.exercises;
+        let doneCount = 0;
+
+        const cards = this.els.planList.querySelectorAll('.ex-card');
+        exercises.forEach((ex, idx) => {
+            const isDone = this.completedToday.has(ex.id);
+            if (isDone) doneCount++;
+            const card = cards[idx];
+            if (card) {
+                card.classList.toggle('completed-ex', isDone);
+                const checkBtn = card.querySelector('.ex-check-btn');
+                if (checkBtn) {
+                    checkBtn.classList.toggle('checked', isDone);
+                    checkBtn.title = isDone ? '已完成（点击取消）' : '点击直接打勾完成';
+                }
+            }
+        });
+
+        if (this.els.planProgressBadge) {
+            this.els.planProgressBadge.textContent = `已完成 ${doneCount}/${exercises.length}`;
+        }
+
+        const remainingCount = exercises.length - doneCount;
+        if (this.els.startWorkoutBtn) {
+            if (remainingCount === 0) {
+                this.els.startWorkoutBtn.textContent = '🎉 今日处方已全部完成 · 再练一轮';
+            } else if (doneCount > 0) {
+                this.els.startWorkoutBtn.textContent = `继续跟练剩余 ${remainingCount} 个动作`;
+            } else {
+                this.els.startWorkoutBtn.textContent = '开始科学跟练（也可点单个动作自由练）';
+            }
+        }
+    }
+
     refreshPrescription() {
         const m = this.health.state.metrics;
-        this.currentPlan = SportsScienceEngine.generateWorkoutPlan(m, this.focusMode);
+        this.currentPlan = SportsScienceEngine.generateWorkoutPlan(m, this.focusMode, this.setsOverride);
         const { readiness, exercises, estMinutes } = this.currentPlan;
 
         // 1. Update Connection Status Bar
@@ -1605,15 +2069,16 @@ class StrengthController {
         this.els.vitalLoad.innerHTML = `${m.yesterdayLoadMins} <small>min</small>`;
 
         // 4. Update Plan Header & Exercise Cards
-        this.els.planTotalEst.textContent = `预计 ${estMinutes} 分钟 · 共 ${exercises.length} 个动作`;
+        this.els.planTotalEst.textContent = `预计 ${estMinutes} 分钟 · 点动作看图解，可自由选练或打勾`;
         this.els.planList.innerHTML = '';
 
         exercises.forEach((ex, idx) => {
+            const isDone = this.completedToday.has(ex.id);
             const card = document.createElement('div');
-            card.className = 'ex-card';
+            card.className = `ex-card${isDone ? ' completed-ex' : ''}`;
             card.dataset.exIdx = idx;
             card.innerHTML = `
-                <div class="ex-card-left">
+                <div class="ex-card-left" data-role="open-guide">
                     <div class="ex-title-row">
                         <span class="ex-index">${idx + 1}</span>
                         <span class="ex-name">${ex.name}</span>
@@ -1622,72 +2087,133 @@ class StrengthController {
                     <div class="ex-cue">${ex.repHint}</div>
                 </div>
                 <div class="ex-card-right">
-                    <div class="ex-Prescription">${ex.sets}组 × ${ex.workSecs}s</div>
-                    <div class="ex-rest-note">休 ${ex.restSecs}s</div>
+                    <div class="ex-right-meta" data-role="open-guide">
+                        <div class="ex-Prescription">${ex.sets}组 × ${ex.workSecs}s</div>
+                        <div class="ex-rest-note">休 ${ex.restSecs}s · 图解</div>
+                    </div>
+                    <div class="ex-action-btns">
+                        <button class="ex-mini-btn" type="button" data-role="solo-play" title="单独为这个动作计时跟练">⏱ 单独练</button>
+                        <button class="ex-check-btn${isDone ? ' checked' : ''}" type="button" data-role="toggle-check" title="自己做完直接打勾">✓</button>
+                    </div>
                 </div>
             `;
+
+            // Clicking left area or prescription opens the illustrated beginner guide
+            card.querySelectorAll('[data-role="open-guide"]').forEach(el => {
+                el.addEventListener('click', () => this.openExerciseGuide(idx));
+            });
+
+            // Clicking "⏱ 单独练" starts timer ONLY for this exercise
+            const soloBtn = card.querySelector('[data-role="solo-play"]');
+            if (soloBtn) {
+                soloBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.startGuidedWorkout(idx);
+                });
+            }
+
+            // Clicking "✓" toggles completion immediately
+            const checkBtn = card.querySelector('[data-role="toggle-check"]');
+            if (checkBtn) {
+                checkBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.toggleExerciseCompleted(ex, true);
+                });
+            }
+
             this.els.planList.appendChild(card);
         });
+
+        this.updateCompletionUI();
 
         // 5. Update Cardio Synergy Recommendation
         this.els.synergyDesc.textContent = readiness.cardioPrescription.desc;
     }
 
-    buildWorkoutTimeline() {
-        const exercises = this.currentPlan ? this.currentPlan.exercises : [];
+    buildWorkoutTimeline(onlyExIndex = null) {
+        const allExercises = this.currentPlan ? this.currentPlan.exercises : [];
         const steps = [];
+        if (allExercises.length === 0) return steps;
 
-        if (exercises.length === 0) return steps;
+        // Build target list of { ex, originalIdx }
+        let targetList = [];
+        if (onlyExIndex !== null && allExercises[onlyExIndex]) {
+            targetList = [{ ex: allExercises[onlyExIndex], originalIdx: onlyExIndex }];
+        } else {
+            // Filter to unchecked exercises first; if all checked, run all exercises
+            const unchecked = allExercises
+                .map((ex, idx) => ({ ex, originalIdx: idx }))
+                .filter(item => !this.completedToday.has(item.ex.id));
+            targetList = unchecked.length > 0
+                ? unchecked
+                : allExercises.map((ex, idx) => ({ ex, originalIdx: idx }));
+        }
 
+        const firstItem = targetList[0];
         // Initial 5s Prep
         steps.push({
             type: 'prep',
             duration: 5,
-            exIndex: 0,
-            exName: `准备：${exercises[0].name}`,
+            exIndex: firstItem.originalIdx,
+            exId: firstItem.ex.id,
+            exName: `准备：${firstItem.ex.name}`,
+            isStatic: Boolean(firstItem.ex.isStatic),
             setNum: 1,
-            totalSets: exercises[0].sets,
-            cue: exercises[0].repHint,
-            nextLabel: `即将开始：${exercises[0].name} 第 1 组`
+            totalSets: firstItem.ex.sets,
+            isLastSetOfEx: false,
+            cue: firstItem.ex.repHint,
+            nextLabel: `即将开始：${firstItem.ex.name} 第 1/${firstItem.ex.sets} 组`
         });
 
-        exercises.forEach((ex, exIdx) => {
+        targetList.forEach((item, listIdx) => {
+            const { ex, originalIdx } = item;
+            const isLastTargetEx = (listIdx === targetList.length - 1);
+
             for (let s = 1; s <= ex.sets; s++) {
                 const isLastSetOfEx = (s === ex.sets);
-                const isLastExercise = (exIdx === exercises.length - 1);
 
                 let nextAfterWork = '';
-                if (isLastSetOfEx && isLastExercise) {
-                    nextAfterWork = '下一项：完成全部训练！';
+                if (isLastSetOfEx && isLastTargetEx) {
+                    nextAfterWork = onlyExIndex !== null
+                        ? `下一项：完成「${ex.name}」全部 ${ex.sets} 组！`
+                        : '下一项：完成今日全部力量训练！';
                 } else if (isLastSetOfEx) {
-                    nextAfterWork = `下一项：组间休息 ${ex.restSecs}s → ${exercises[exIdx + 1].name}`;
+                    const nextTarget = targetList[listIdx + 1].ex;
+                    nextAfterWork = `下一项：休息 ${ex.restSecs}s → ${nextTarget.name}`;
                 } else {
-                    nextAfterWork = `下一项：组间休息 ${ex.restSecs}s`;
+                    nextAfterWork = `下一项：组间休息 ${ex.restSecs}s → 第 ${s + 1} 组`;
                 }
 
                 steps.push({
                     type: 'work',
                     duration: ex.workSecs,
-                    exIndex: exIdx,
+                    exIndex: originalIdx,
+                    exId: ex.id,
                     exName: ex.name,
+                    isStatic: Boolean(ex.isStatic),
                     setNum: s,
                     totalSets: ex.sets,
+                    isLastSetOfEx,
                     cue: ex.repHint,
                     nextLabel: nextAfterWork
                 });
 
-                // Add Rest unless it's the very last set of the very last exercise
-                if (!(isLastSetOfEx && isLastExercise)) {
-                    const nextEx = isLastSetOfEx ? exercises[exIdx + 1] : ex;
+                // Add Rest unless it's the very last set of the very last target exercise
+                if (!(isLastSetOfEx && isLastTargetEx)) {
+                    const nextEx = isLastSetOfEx ? targetList[listIdx + 1].ex : ex;
+                    const nextOrigIdx = isLastSetOfEx ? targetList[listIdx + 1].originalIdx : originalIdx;
                     const nextSetNum = isLastSetOfEx ? 1 : s + 1;
                     steps.push({
                         type: 'rest',
                         duration: ex.restSecs,
-                        exIndex: isLastSetOfEx ? exIdx + 1 : exIdx,
-                        exName: '组间休息 · 调整呼吸',
+                        exIndex: nextOrigIdx,
+                        exId: nextEx.id,
+                        exName: '组间休息 · 放松抖动肌肉',
+                        isStatic: false,
                         setNum: nextSetNum,
                         totalSets: nextEx.sets,
-                        cue: `下一动作要领：${nextEx.repHint}`,
+                        isLastSetOfEx: false,
+                        cue: `下一组要领：${nextEx.repHint}`,
                         nextLabel: `即将进入：${nextEx.name} (第 ${nextSetNum}/${nextEx.sets} 组)`
                     });
                 }
@@ -1697,11 +2223,11 @@ class StrengthController {
         return steps;
     }
 
-    async startGuidedWorkout() {
+    async startGuidedWorkout(onlyExIndex = null) {
         await this.app.requestAudio();
         await this.app.requestWakeLock();
 
-        this.timeline = this.buildWorkoutTimeline();
+        this.timeline = this.buildWorkoutTimeline(onlyExIndex);
         if (this.timeline.length === 0) return;
 
         this.stepIndex = 0;
@@ -1710,6 +2236,10 @@ class StrengthController {
         this.totalWorkoutSecs = this.timeline.reduce((acc, st) => acc + st.duration, 0);
 
         this.isRunning = true;
+        // Collapse top readiness card during active workout so player fits on one screen!
+        if (this.els.readinessCard) {
+            this.els.readinessCard.classList.add('hidden');
+        }
         this.els.playerPanel.classList.remove('hidden');
         this.els.bottomBar.classList.add('hidden');
         this.els.pauseBtn.textContent = '暂停';
@@ -1718,8 +2248,8 @@ class StrengthController {
         this.renderPlayerStep();
         this.app.startWorker();
 
-        // Scroll player into view smoothly
-        this.els.playerPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        // Scroll player into view smoothly at the top
+        this.els.playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     async togglePause() {
@@ -1747,6 +2277,9 @@ class StrengthController {
         this.isRunning = false;
         this.app.stopWorker();
         this.app.releaseWakeLock();
+        if (this.els.readinessCard) {
+            this.els.readinessCard.classList.remove('hidden');
+        }
         this.els.playerPanel.classList.add('hidden');
         this.els.bottomBar.classList.remove('hidden');
         this.highlightExerciseCard(-1);
@@ -1759,7 +2292,40 @@ class StrengthController {
         });
     }
 
-    renderPlayerStep() {
+    updateBreathingCue(step, triggerAudio = false) {
+        if (!this.els.rhythmPill) return;
+        if (step.type !== 'work') {
+            this.els.rhythmPill.textContent = step.type === 'prep' ? '准备就位 · 调整站姿/垫面' : '深长呼吸 · 放松肩膀与手臂';
+            this.els.rhythmPill.className = 'rhythm-pill';
+            return;
+        }
+
+        if (step.isStatic) {
+            this.els.rhythmPill.textContent = '保持核心收紧 · 均匀深呼吸勿憋气';
+            this.els.rhythmPill.className = 'rhythm-pill exhale';
+            return;
+        }
+
+        // Dynamic exercises: 4-second tempo cycle (2s eccentric inhale down + 2s concentric exhale up)
+        const elapsedInSet = step.duration - this.timeLeft;
+        const phaseInCycle = elapsedInSet % 4; // 0,1 = inhale down; 2,3 = exhale up
+
+        if (phaseInCycle < 2) {
+            this.els.rhythmPill.textContent = '吸气慢下 ↓ (控制肌肉离心)';
+            this.els.rhythmPill.className = 'rhythm-pill inhale';
+            if (triggerAudio && phaseInCycle === 0 && this.timeLeft > 3) {
+                this.app.audio.playInhaleCue();
+            }
+        } else {
+            this.els.rhythmPill.textContent = '呼气发力 ↑ (收紧核心推起)';
+            this.els.rhythmPill.className = 'rhythm-pill exhale';
+            if (triggerAudio && phaseInCycle === 2 && this.timeLeft > 3) {
+                this.app.audio.playExhaleCue();
+            }
+        }
+    }
+
+    renderPlayerStep(triggerBreathingAudio = false) {
         const step = this.timeline[this.stepIndex];
         if (!step) return;
 
@@ -1775,6 +2341,8 @@ class StrengthController {
             this.els.phaseBadge.textContent = '组间休息';
             this.els.phaseBadge.className = 'phase-pill rest';
         }
+
+        this.updateBreathingCue(step, triggerBreathingAudio);
 
         this.els.progressMeta.textContent = `动作 ${step.exIndex + 1}/${totalExercises} · 第 ${step.setNum}/${step.totalSets} 组`;
         this.els.currentExName.textContent = step.exName;
@@ -1798,22 +2366,43 @@ class StrengthController {
     }
 
     advanceStep() {
+        const finishedStep = this.timeline[this.stepIndex];
+        // If user just finished the last set of an exercise, auto-check it off!
+        if (finishedStep && finishedStep.type === 'work' && finishedStep.isLastSetOfEx && finishedStep.exId) {
+            this.completedToday.add(finishedStep.exId);
+            this.saveTodayCompleted();
+            this.updateCompletionUI();
+        }
+
         this.stepIndex++;
         if (this.stepIndex >= this.timeline.length) {
-            // Completed all steps!
+            // Completed all steps in this session!
             this.app.audio.playFinish();
             this.isRunning = false;
             this.app.stopWorker();
             this.app.releaseWakeLock();
 
-            this.els.phaseBadge.textContent = '训练完成';
+            if (this.els.readinessCard) {
+                this.els.readinessCard.classList.remove('hidden');
+            }
+            this.els.phaseBadge.textContent = '本轮完成';
             this.els.phaseBadge.className = 'phase-pill work';
-            this.els.currentExName.textContent = '今日力量处方已完成！';
-            this.els.currentExTarget.textContent = '可点击下方「去慢跑」继续完成心肺燃脂联动';
+            if (this.els.rhythmPill) {
+                this.els.rhythmPill.textContent = '已自动打勾记录并同步 Google Fit';
+                this.els.rhythmPill.className = 'rhythm-pill exhale';
+            }
+            this.els.currentExName.textContent = '太棒了！本轮力量训练已完成';
+            this.els.currentExTarget.textContent = '可继续点选其他动作，或点击「去慢跑」开启有氧燃脂';
             this.els.timerDisplay.textContent = 'DONE';
             this.els.totalProgress.style.width = '100%';
             this.els.bottomBar.classList.remove('hidden');
             this.highlightExerciseCard(-1);
+
+            this.health.recordWorkoutSession(
+                'Niko 科学自重力量训练',
+                this.totalWorkoutSecs,
+                80
+            );
             return;
         }
 
@@ -1824,7 +2413,7 @@ class StrengthController {
         } else {
             this.app.audio.playRestBeep();
         }
-        this.renderPlayerStep();
+        this.renderPlayerStep(false);
     }
 
     onTick(now, delta) {
@@ -1841,7 +2430,7 @@ class StrengthController {
             if (this.timeLeft < 0) {
                 this.advanceStep();
             } else {
-                this.renderPlayerStep();
+                this.renderPlayerStep(true);
             }
             return true;
         }

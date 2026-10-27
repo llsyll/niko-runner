@@ -9,7 +9,7 @@
     <meta name="description" content="超慢跑节拍器 & 计时助手">
     <meta name="theme-color" content="#000000">
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="style.css?v=9">
+    <link rel="stylesheet" href="style.css?v=10">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
@@ -217,10 +217,14 @@
             <div id="strength-player-panel" class="strength-player hidden">
                 <div class="player-top-meta">
                     <span id="str-phase-badge" class="phase-pill work">动作进行中</span>
-                    <span id="str-progress-meta" class="player-meta-text">动作 1/5 · 第 1/4 组</span>
+                    <span id="str-progress-meta" class="player-meta-text">动作 1/5 · 第 1/3 组</span>
                 </div>
                 <div id="str-current-ex-name" class="player-ex-name">标准俯卧撑</div>
-                <div id="str-current-ex-target" class="player-ex-target">建议 12-15 次 · 保持核心收紧</div>
+                <div id="str-current-ex-target" class="player-ex-target">建议 10-15 次 · 吸气慢下，呼气推起</div>
+
+                <!-- Live Breathing / Tempo Rhythm Pill -->
+                <div id="str-rhythm-pill" class="rhythm-pill">准备开始 · 调整呼吸</div>
+
                 <div id="str-timer-display" class="player-timer">00:40</div>
                 <div class="total-progress-container player-progress-wrap">
                     <div id="str-total-progress" class="total-progress-bar"></div>
@@ -228,17 +232,30 @@
                 <div id="str-next-up" class="player-next-up">下一项：组间休息 30s</div>
                 <div class="player-controls">
                     <button id="str-pause-btn" class="control-btn start-btn btn-sm">暂停</button>
-                    <button id="str-skip-btn" class="control-btn stop-btn btn-sm">跳过</button>
-                    <button id="str-stop-btn" class="control-btn stop-btn btn-sm">结束</button>
+                    <button id="str-skip-btn" class="control-btn stop-btn btn-sm">做完本组/跳过</button>
+                    <button id="str-stop-btn" class="control-btn stop-btn btn-sm">收起</button>
                 </div>
             </div>
 
             <!-- Prescribed Plan List (Shown when not actively in full-screen player or below) -->
             <div id="strength-plan-container" class="strength-plan-container">
                 <div class="plan-section-header">
-                    <span id="plan-header-title">今日徒手力量处方</span>
-                    <span id="plan-total-est" class="plan-est-time">预计 16 分钟</span>
+                    <div class="plan-title-group">
+                        <span id="plan-header-title">今日 3+2 黄金处方</span>
+                        <span id="plan-progress-badge" class="plan-progress-badge">已完成 0/5</span>
+                    </div>
+                    <div class="sets-override-bar" id="sets-override-chips">
+                        <button class="set-pill active" data-sets="auto">智能</button>
+                        <button class="set-pill" data-sets="2">2组</button>
+                        <button class="set-pill" data-sets="3">3组</button>
+                        <button class="set-pill" data-sets="4">4组</button>
+                    </div>
                 </div>
+                <div class="plan-sub-bar">
+                    <span class="plan-usage-hint">💡 点动作可看图解或单独计时，自己数完可直接点右侧 ✓</span>
+                    <span id="plan-total-est" class="plan-est-time">约 12 分钟</span>
+                </div>
+
                 <div id="strength-plan-list" class="strength-plan-list">
                     <!-- Populated dynamically by StrengthController -->
                 </div>
@@ -246,7 +263,7 @@
                 <!-- Cardio Synergy Recommendation Card -->
                 <div class="cardio-synergy-card" id="cardio-synergy-card">
                     <div class="synergy-info">
-                        <div class="synergy-title">心肺联动建议（力量后有氧）</div>
+                        <div class="synergy-title">心肺联动建议（力量后最佳燃脂有氧）</div>
                         <div class="synergy-desc" id="synergy-desc">15 分钟超慢跑 · 180 BPM 最佳燃脂步频</div>
                     </div>
                     <button id="btn-apply-niko" class="synergy-btn">去慢跑</button>
@@ -255,7 +272,46 @@
 
             <!-- Bottom Start Action -->
             <div class="strength-bottom-bar" id="strength-bottom-bar">
-                <button id="str-start-workout-btn" class="control-btn start-btn full-width-btn">开始今日跟练</button>
+                <button id="str-start-workout-btn" class="control-btn start-btn full-width-btn">全程跟练未完成项</button>
+            </div>
+        </div>
+
+        <!-- MODAL: Beginner Exercise Illustrated Guide -->
+        <div id="ex-guide-modal" class="modal-overlay hidden">
+            <div class="modal-card guide-modal-card">
+                <div class="modal-header">
+                    <h3 id="guide-modal-title">动作详解</h3>
+                    <button id="btn-close-guide" class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body guide-modal-body">
+                    <div class="guide-svg-box" id="guide-svg-box"></div>
+                    <div class="guide-tag-row">
+                        <span id="guide-role-badge" class="guide-badge">补齐短板</span>
+                        <span id="guide-prescription-badge" class="guide-badge-outline">3组 × 12-15次</span>
+                    </div>
+                    <div class="guide-steps">
+                        <div class="guide-step-item">
+                            <div class="guide-step-label">① 准备姿势</div>
+                            <div class="guide-step-text" id="guide-step-setup"></div>
+                        </div>
+                        <div class="guide-step-item">
+                            <div class="guide-step-label">② 发力与呼吸口诀</div>
+                            <div class="guide-step-text" id="guide-step-exec"></div>
+                        </div>
+                        <div class="guide-step-item">
+                            <div class="guide-step-label">③ 常见错误（防伤提醒）</div>
+                            <div class="guide-step-text warning-text" id="guide-step-mistake"></div>
+                        </div>
+                        <div class="guide-step-item">
+                            <div class="guide-step-label">④ 为什么加这个动作？</div>
+                            <div class="guide-step-text" id="guide-step-why"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer guide-footer-btns">
+                    <button type="button" id="btn-guide-check" class="btn-secondary">✓ 标记今日已练完</button>
+                    <button type="button" id="btn-guide-play" class="btn-primary-sm">⏱ 单独计时跟练</button>
+                </div>
             </div>
         </div>
 
@@ -340,11 +396,11 @@
         </div>
     </div>
 
-    <script src="main.js?v=9"></script>
+    <script src="main.js?v=10"></script>
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js?v=9').then(reg => {
+                navigator.serviceWorker.register('./sw.js?v=10').then(reg => {
                     reg.update();
                 }).catch(() => {});
             });
