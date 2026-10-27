@@ -1,4 +1,4 @@
-const CACHE_NAME = 'niko-run-v3';
+const CACHE_NAME = 'niko-run-v4';
 const ASSETS = [
     './',
     './index.html',

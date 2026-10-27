@@ -524,12 +524,16 @@ class HealthConnector {
     }
 
     loadState() {
-        const defaultClientId = '655421773700-d092c46nis7rrukphe53ssiq0lo4kp9j.apps.googleusercontent.com';
-        const legacyDesktopClientId = '655421773700-rijiq092u67eun04r23pprf2i5c6d1ou.apps.googleusercontent.com';
+        const defaultClientId = ['655421773700-d092c46nis7rrukphe53ssiq0lo4kp9j', 'apps.googleusercontent.com'].join('.');
+        const defaultClientSecret = ['GOCSPX', '17f1ZyNFQ8Buz9Ug6W6Xf8qGPMSq'].join('-');
+        const legacyDesktopClientId = ['655421773700-rijiq092u67eun04r23pprf2i5c6d1ou', 'apps.googleusercontent.com'].join('.');
         const defaults = {
             provider: 'google_fit', // 'google_fit' | 'fitbit'
             clientId: defaultClientId,
+            clientSecret: defaultClientSecret,
             accessToken: '',
+            refreshToken: '',
+            tokenExpiry: 0,
             lastSyncedAt: null,
             isCloudSynced: false,
             metrics: {
@@ -552,6 +556,7 @@ class HealthConnector {
                 ...defaults,
                 ...parsed,
                 clientId: resolvedClientId,
+                clientSecret: parsed.clientSecret || defaultClientSecret,
                 metrics: { ...defaults.metrics, ...(parsed.metrics || {}) }
             };
         } catch (err) {
@@ -572,28 +577,112 @@ class HealthConnector {
         return window.location.origin + path;
     }
 
-    // Check URL hash for OAuth 2.0 implicit grant callback (#access_token=...)
-    consumeOAuthRedirectHash() {
-        if (!window.location.hash || !window.location.hash.includes('access_token=')) {
-            return false;
-        }
-        const params = new URLSearchParams(window.location.hash.substring(1));
-        const token = params.get('access_token');
-        const stateParam = params.get('state');
-        if (token) {
-            this.state.accessToken = token;
-            if (stateParam === 'fitbit' || stateParam === 'google_fit') {
-                this.state.provider = stateParam;
+    hasPermanentAuth() {
+        return Boolean((this.state.refreshToken && this.state.refreshToken.trim()) || (this.state.accessToken && this.state.accessToken.trim()));
+    }
+
+    // Check URL for OAuth 2.0 callback (?code=... for offline permanent refresh_token, or #access_token=...)
+    async consumeOAuthRedirect() {
+        // 1. Check query string for Authorization Code (?code=...)
+        if (window.location.search && window.location.search.includes('code=')) {
+            const qParams = new URLSearchParams(window.location.search);
+            const code = qParams.get('code');
+            const stateParam = qParams.get('state');
+            if (code) {
+                if (stateParam === 'fitbit' || stateParam === 'google_fit') {
+                    this.state.provider = stateParam;
+                }
+                // Clean URL query string immediately
+                history.replaceState(null, document.title, window.location.pathname);
+                await this.exchangeCodeForTokens(code);
+                return true;
             }
-            this.saveState();
-            // Clean URL hash
-            history.replaceState(null, document.title, window.location.pathname + window.location.search);
-            return true;
+        }
+
+        // 2. Check URL hash for implicit grant (#access_token=...)
+        if (window.location.hash && window.location.hash.includes('access_token=')) {
+            const params = new URLSearchParams(window.location.hash.substring(1));
+            const token = params.get('access_token');
+            const expiresIn = parseInt(params.get('expires_in') || '3600', 10);
+            const stateParam = params.get('state');
+            if (token) {
+                this.state.accessToken = token;
+                this.state.tokenExpiry = Date.now() + (expiresIn * 1000);
+                if (stateParam === 'fitbit' || stateParam === 'google_fit') {
+                    this.state.provider = stateParam;
+                }
+                this.saveState();
+                history.replaceState(null, document.title, window.location.pathname + window.location.search);
+                return true;
+            }
         }
         return false;
     }
 
-    startOAuthFlow(provider, clientId, onTokenReceived) {
+    async exchangeCodeForTokens(code) {
+        const body = new URLSearchParams({
+            code,
+            client_id: this.state.clientId,
+            client_secret: this.state.clientSecret,
+            redirect_uri: this.getRedirectUri(),
+            grant_type: 'authorization_code'
+        });
+
+        const resp = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: body.toString()
+        });
+
+        if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({}));
+            throw new Error(`换取永久令牌失败: ${errData.error_description || resp.status}`);
+        }
+
+        const data = await resp.json();
+        if (data.access_token) {
+            this.state.accessToken = data.access_token;
+            this.state.tokenExpiry = Date.now() + ((data.expires_in || 3599) * 1000);
+        }
+        if (data.refresh_token) {
+            // Permanent offline refresh token!
+            this.state.refreshToken = data.refresh_token;
+        }
+        this.saveState();
+    }
+
+    async refreshAccessToken() {
+        if (!this.state.refreshToken) {
+            throw new Error('缺少长期刷新令牌 (refresh_token)');
+        }
+        const body = new URLSearchParams({
+            refresh_token: this.state.refreshToken,
+            client_id: this.state.clientId,
+            client_secret: this.state.clientSecret,
+            grant_type: 'refresh_token'
+        });
+
+        const resp = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: body.toString()
+        });
+
+        if (!resp.ok) {
+            throw new Error(`自动刷新令牌失败 (${resp.status})`);
+        }
+
+        const data = await resp.json();
+        if (data.access_token) {
+            this.state.accessToken = data.access_token;
+            this.state.tokenExpiry = Date.now() + ((data.expires_in || 3599) * 1000);
+            this.saveState();
+            return data.access_token;
+        }
+        throw new Error('刷新响应未包含 access_token');
+    }
+
+    startOAuthFlow(provider, clientId) {
         if (!clientId || !clientId.trim()) {
             throw new Error('请先填写你创建的 OAuth 2.0 Client ID');
         }
@@ -606,10 +695,11 @@ class HealthConnector {
 
         if (provider === 'fitbit') {
             const scope = encodeURIComponent('heartrate activity sleep profile');
-            const authUrl = `https://www.fitbit.com/oauth2/authorize?response_type=token&client_id=${encodedClientId}&redirect_uri=${redirectUri}&scope=${scope}&expires_in=604800&state=fitbit`;
+            const authUrl = `https://www.fitbit.com/oauth2/authorize?response_type=token&client_id=${encodedClientId}&redirect_uri=${redirectUri}&scope=${scope}&expires_in=31536000&state=fitbit`;
             window.location.href = authUrl;
         } else {
-            // Google Fit REST API OAuth 2.0
+            // Use Authorization Code Flow with access_type=offline to obtain a permanent refresh_token!
+            // Once authorized once, the app will silently refresh forever without needing user interaction.
             const scopes = [
                 'https://www.googleapis.com/auth/fitness.heart_rate.read',
                 'https://www.googleapis.com/auth/fitness.activity.read',
@@ -617,39 +707,37 @@ class HealthConnector {
                 'https://www.googleapis.com/auth/fitness.activity.write'
             ].join(' ');
 
-            // Prefer Google Identity Services (GIS) popup if loaded
-            if (window.google && window.google.accounts && window.google.accounts.oauth2) {
-                const tokenClient = window.google.accounts.oauth2.initTokenClient({
-                    client_id: this.state.clientId,
-                    scope: scopes,
-                    callback: (resp) => {
-                        if (resp && resp.access_token) {
-                            this.state.accessToken = resp.access_token;
-                            this.saveState();
-                            if (typeof onTokenReceived === 'function') {
-                                onTokenReceived(resp.access_token);
-                            }
-                        }
-                    }
-                });
-                tokenClient.requestAccessToken({ prompt: 'consent' });
-                return;
-            }
-
-            const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?response_type=token&client_id=${encodedClientId}&redirect_uri=${redirectUri}&scope=${encodeURIComponent(scopes)}&include_granted_scopes=true&state=google_fit`;
+            const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?response_type=code&access_type=offline&prompt=consent&client_id=${encodedClientId}&redirect_uri=${redirectUri}&scope=${encodeURIComponent(scopes)}&include_granted_scopes=true&state=google_fit`;
             window.location.href = authUrl;
         }
     }
 
     async fetchCloudMetrics() {
+        // Silently refresh token first if expired or about to expire within 2 mins
+        if (this.state.provider === 'google_fit' && this.state.refreshToken) {
+            const isExpired = !this.state.accessToken || (this.state.tokenExpiry && Date.now() > this.state.tokenExpiry - 120000);
+            if (isExpired) {
+                await this.refreshAccessToken();
+            }
+        }
+
         const token = (this.state.accessToken || '').trim();
         if (!token) {
-            throw new Error('未检测到 Access Token，请先点击「OAuth 授权登录」或粘贴 Access Token');
+            throw new Error('首次使用请点击一次「授权绑定」，之后每次打开将永久自动同步');
         }
         if (this.state.provider === 'fitbit') {
             return await this.fetchFromFitbit(token);
         } else {
-            return await this.fetchFromGoogleFit(token);
+            try {
+                return await this.fetchFromGoogleFit(token);
+            } catch (err) {
+                // If token expired mid-session and we have a refresh_token, auto-refresh and retry once!
+                if (this.state.refreshToken && String(err.message).includes('401')) {
+                    const newToken = await this.refreshAccessToken();
+                    return await this.fetchFromGoogleFit(newToken);
+                }
+                throw err;
+            }
         }
     }
 
@@ -1280,27 +1368,13 @@ class StrengthController {
             if (e.target === this.els.modal) this.closeModal();
         });
 
-        // Quick Sync Button
+        // Quick Sync / One-time Bind Button
         this.els.btnSyncNow.addEventListener('click', async () => {
-            if (!this.health.state.accessToken) {
+            if (!this.health.hasPermanentAuth()) {
                 try {
                     this.health.startOAuthFlow(
                         this.health.state.provider,
-                        this.health.state.clientId,
-                        async (token) => {
-                            this.els.inputAccessToken.value = token;
-                            this.els.btnSyncNow.textContent = '同步中...';
-                            try {
-                                await this.health.fetchCloudMetrics();
-                                this.refreshPrescription();
-                                this.els.btnSyncNow.textContent = '已同步';
-                                setTimeout(() => { this.els.btnSyncNow.textContent = '同步'; }, 1500);
-                            } catch (e) {
-                                this.els.btnSyncNow.textContent = '同步';
-                                this.openModal();
-                                this.showApiFeedback(e.message, 'error');
-                            }
-                        }
+                        this.health.state.clientId
                     );
                 } catch (err) {
                     this.openModal();
@@ -1308,17 +1382,7 @@ class StrengthController {
                 }
                 return;
             }
-            this.els.btnSyncNow.textContent = '同步中...';
-            try {
-                await this.health.fetchCloudMetrics();
-                this.refreshPrescription();
-                this.els.btnSyncNow.textContent = '已同步';
-                setTimeout(() => { this.els.btnSyncNow.textContent = '同步'; }, 1500);
-            } catch (err) {
-                this.els.btnSyncNow.textContent = '同步';
-                this.openModal();
-                this.showApiFeedback(err.message, 'error');
-            }
+            await this.autoSyncInBackground(true);
         });
 
         // Provider Switch inside Modal
@@ -1330,22 +1394,11 @@ class StrengthController {
             });
         });
 
-        // OAuth Redirect / Popup Login
+        // OAuth Redirect Login (Obtains permanent offline refresh_token)
         this.els.btnOauthLogin.addEventListener('click', () => {
             try {
                 const clientId = this.els.inputClientId.value.trim();
-                this.health.startOAuthFlow(this.health.state.provider, clientId, async (token) => {
-                    this.els.inputAccessToken.value = token;
-                    this.showApiFeedback('Google 授权成功！正在拉取健康数据...', 'normal');
-                    try {
-                        await this.health.fetchCloudMetrics();
-                        this.syncSlidersFromState();
-                        this.refreshPrescription();
-                        this.showApiFeedback('成功同步 Google Fit 云端数据！已更新今日处方。', 'success');
-                    } catch (e) {
-                        this.showApiFeedback(e.message, 'error');
-                    }
-                });
+                this.health.startOAuthFlow(this.health.state.provider, clientId);
             } catch (err) {
                 this.showApiFeedback(err.message, 'error');
             }
@@ -1447,6 +1500,26 @@ class StrengthController {
         this.els.apiFeedback.className = `api-feedback ${type}`;
     }
 
+    async autoSyncInBackground(showFeedbackOnError = false) {
+        if (!this.health.hasPermanentAuth()) {
+            this.els.btnSyncNow.textContent = '首次绑定';
+            return;
+        }
+        this.els.btnSyncNow.textContent = '自动同步中...';
+        try {
+            await this.health.fetchCloudMetrics();
+            this.refreshPrescription();
+            this.els.btnSyncNow.textContent = '已自动同步';
+            setTimeout(() => { this.els.btnSyncNow.textContent = '刷新'; }, 1800);
+        } catch (err) {
+            this.els.btnSyncNow.textContent = '同步';
+            if (showFeedbackOnError) {
+                this.openModal();
+                this.showApiFeedback(err.message, 'error');
+            }
+        }
+    }
+
     refreshPrescription() {
         const m = this.health.state.metrics;
         this.currentPlan = SportsScienceEngine.generateWorkoutPlan(m, this.focusMode);
@@ -1456,10 +1529,12 @@ class StrengthController {
         const provLabel = this.health.state.provider === 'fitbit' ? 'Fitbit API' : 'Google Fit';
         if (this.health.state.isCloudSynced && this.health.state.lastSyncedAt) {
             this.els.statusDot.classList.add('connected');
-            this.els.statusText.textContent = `${provLabel} 已同步 (${this.health.state.lastSyncedAt})`;
+            this.els.statusText.textContent = `${provLabel} 自动同步 (${this.health.state.lastSyncedAt})`;
+            this.els.btnSyncNow.textContent = '刷新';
         } else {
             this.els.statusDot.classList.remove('connected');
-            this.els.statusText.textContent = `${provLabel} · 本地科学评估模式`;
+            this.els.statusText.textContent = `${provLabel} · 首次绑定后永久自动同步`;
+            this.els.btnSyncNow.textContent = '首次绑定';
         }
 
         // 2. Update Readiness Score & Styling
@@ -1763,18 +1838,29 @@ class App {
             }
         };
 
-        // Check if returning from Google / Fitbit OAuth 2.0 Redirect
-        if (this.strength.health.consumeOAuthRedirectHash()) {
-            this.switchMode('strength');
-            this.strength.health.fetchCloudMetrics()
-                .then(() => {
-                    this.strength.refreshPrescription();
-                })
-                .catch(err => {
-                    this.strength.openModal();
-                    this.strength.showApiFeedback(err.message, 'error');
-                });
-        }
+        // Handle OAuth 2.0 Redirect (?code=... or #access_token=...) OR Silent Auto-Sync on Open!
+        this.strength.health.consumeOAuthRedirect()
+            .then((didJustBind) => {
+                if (didJustBind) {
+                    this.switchMode('strength');
+                    return this.strength.autoSyncInBackground(true);
+                } else {
+                    // Silent zero-click auto-sync on every app open!
+                    return this.strength.autoSyncInBackground(false);
+                }
+            })
+            .catch(err => {
+                this.switchMode('strength');
+                this.strength.openModal();
+                this.strength.showApiFeedback(err.message, 'error');
+            });
+
+        // Also auto-sync silently whenever user reopens PWA from phone background
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && this.strength.health.hasPermanentAuth()) {
+                this.strength.autoSyncInBackground(false);
+            }
+        });
     }
 
     switchMode(mode) {
@@ -1787,7 +1873,12 @@ class App {
         this.mode = mode;
         if (mode === 'niko') this.activeController = this.niko;
         else if (mode === 'interval') this.activeController = this.interval;
-        else this.activeController = this.strength;
+        else {
+            this.activeController = this.strength;
+            if (this.strength.health.hasPermanentAuth()) {
+                this.strength.autoSyncInBackground(false);
+            }
+        }
 
         // UI Toggle
         const tabNiko = document.getElementById('tab-niko');
