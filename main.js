@@ -785,29 +785,36 @@ class HealthConnector {
         startOfToday.setHours(0, 0, 0, 0);
         const startOfYesterday = startOfToday.getTime() - 86400000;
 
-        // 1. Aggregate Heart Rate, Step Count, Active Minutes over yesterday + today
-        const aggResp = await fetch('https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate', {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-                aggregateBy: [
-                    { dataTypeName: 'com.google.heart_rate.bpm' },
-                    { dataTypeName: 'com.google.step_count.delta' },
-                    { dataTypeName: 'com.google.active_minutes' }
-                ],
-                bucketByTime: { durationMillis: 86400000 },
-                startTimeMillis: startOfYesterday,
-                endTimeMillis: now
-            })
-        });
-
-        if (!aggResp.ok) {
-            const errText = await aggResp.text();
-            throw new Error(`Google Fit API 请求失败 (${aggResp.status}): 请检查 Token 权限或是否过期`);
+        // Verify connectivity via dataSources endpoint first
+        const dsResp = await fetch('https://www.googleapis.com/fitness/v1/users/me/dataSources', { headers });
+        if (!dsResp.ok) {
+            const errJson = await dsResp.json().catch(() => ({}));
+            const reason = errJson.error?.message || `HTTP ${dsResp.status}`;
+            throw new Error(`Google Fit API (${dsResp.status}): ${reason}`);
         }
 
-        const aggData = await aggResp.json();
-        const buckets = aggData.bucket || [];
+        // Helper to aggregate a single dataType safely without failing the whole batch if a source is empty
+        const aggregateSingleType = async (dataTypeName) => {
+            const resp = await fetch('https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    aggregateBy: [{ dataTypeName }],
+                    bucketByTime: { durationMillis: 86400000 },
+                    startTimeMillis: startOfYesterday,
+                    endTimeMillis: now
+                })
+            });
+            if (!resp.ok) return [];
+            const data = await resp.json().catch(() => ({}));
+            return data.bucket || [];
+        };
+
+        const [hrBuckets, stepBuckets, activeBuckets] = await Promise.all([
+            aggregateSingleType('com.google.heart_rate.bpm'),
+            aggregateSingleType('com.google.step_count.delta'),
+            aggregateSingleType('com.google.active_minutes')
+        ]);
 
         let latestMinHr = null;
         let latestAvgHr = null;
@@ -816,31 +823,36 @@ class HealthConnector {
         let yesterdayActiveMins = 0;
         let todayActiveMins = 0;
 
-        buckets.forEach((b, idx) => {
-            const isTodayBucket = (idx === buckets.length - 1);
+        hrBuckets.forEach((b) => {
             (b.dataset || []).forEach(ds => {
-                const sourceId = ds.dataSourceId || '';
                 (ds.point || []).forEach(pt => {
                     const vals = pt.value || [];
-                    if (sourceId.includes('heart_rate')) {
-                        // Aggregate heart rate has fpVal: [avg, max, min]
-                        const avg = vals[0]?.fpVal;
-                        const min = vals[2]?.fpVal || avg;
-                        if (min && min > 35 && min < 110) {
-                            latestMinHr = Math.round(min);
-                        }
-                        if (avg && avg > 40 && avg < 130) {
-                            latestAvgHr = Math.round(avg);
-                        }
-                    } else if (sourceId.includes('step_count')) {
-                        const steps = vals[0]?.intVal || 0;
-                        if (isTodayBucket) totalStepsToday += steps;
-                        else yesterdaySteps += steps;
-                    } else if (sourceId.includes('active_minutes')) {
-                        const mins = vals[0]?.intVal || 0;
-                        if (isTodayBucket) todayActiveMins += mins;
-                        else yesterdayActiveMins += mins;
-                    }
+                    const avg = vals[0]?.fpVal;
+                    const min = vals[2]?.fpVal || avg;
+                    if (min && min > 35 && min < 110) latestMinHr = Math.round(min);
+                    if (avg && avg > 40 && avg < 130) latestAvgHr = Math.round(avg);
+                });
+            });
+        });
+
+        stepBuckets.forEach((b, idx) => {
+            const isTodayBucket = (idx === stepBuckets.length - 1);
+            (b.dataset || []).forEach(ds => {
+                (ds.point || []).forEach(pt => {
+                    const steps = pt.value?.[0]?.intVal || 0;
+                    if (isTodayBucket) totalStepsToday += steps;
+                    else yesterdaySteps += steps;
+                });
+            });
+        });
+
+        activeBuckets.forEach((b, idx) => {
+            const isTodayBucket = (idx === activeBuckets.length - 1);
+            (b.dataset || []).forEach(ds => {
+                (ds.point || []).forEach(pt => {
+                    const mins = pt.value?.[0]?.intVal || 0;
+                    if (isTodayBucket) todayActiveMins += mins;
+                    else yesterdayActiveMins += mins;
                 });
             });
         });
@@ -879,8 +891,12 @@ class HealthConnector {
             }
         }
         this.state.metrics.sleepHours = sleepHours;
-        this.state.metrics.steps = totalStepsToday > 0 ? totalStepsToday : yesterdaySteps;
-        this.state.metrics.yesterdayLoadMins = yesterdayActiveMins > 0 ? yesterdayActiveMins : todayActiveMins;
+        if (totalStepsToday > 0 || yesterdaySteps > 0) {
+            this.state.metrics.steps = totalStepsToday > 0 ? totalStepsToday : yesterdaySteps;
+        }
+        if (yesterdayActiveMins > 0 || todayActiveMins > 0) {
+            this.state.metrics.yesterdayLoadMins = yesterdayActiveMins > 0 ? yesterdayActiveMins : todayActiveMins;
+        }
 
         this.state.isCloudSynced = true;
         this.state.lastSyncedAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
