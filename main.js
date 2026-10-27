@@ -590,13 +590,25 @@ class HealthConnector {
             const qParams = new URLSearchParams(window.location.search);
             const code = qParams.get('code');
             const stateParam = qParams.get('state');
+            // Clean URL query string immediately so reload never reuses single-use code
+            history.replaceState(null, document.title, window.location.pathname);
             if (code) {
+                const lastUsedCode = sessionStorage.getItem('niko_used_oauth_code');
+                if (lastUsedCode === code) {
+                    return true;
+                }
+                sessionStorage.setItem('niko_used_oauth_code', code);
                 if (stateParam === 'fitbit' || stateParam === 'google_fit') {
                     this.state.provider = stateParam;
                 }
-                // Clean URL query string immediately
-                history.replaceState(null, document.title, window.location.pathname);
-                await this.exchangeCodeForTokens(code);
+                try {
+                    await this.exchangeCodeForTokens(code);
+                } catch (err) {
+                    // If first pass already succeeded and saved tokens, ignore duplicate exchange error
+                    if (!this.hasPermanentAuth()) {
+                        throw err;
+                    }
+                }
                 return true;
             }
         }

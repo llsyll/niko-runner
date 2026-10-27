@@ -1,9 +1,9 @@
-const CACHE_NAME = 'niko-run-v5';
+const CACHE_NAME = 'niko-run-v6';
 const ASSETS = [
     './',
     './index.html',
-    './style.css?v=5',
-    './main.js?v=5',
+    './style.css?v=6',
+    './main.js?v=6',
     './tm-worker.js',
     './manifest.json'
 ];
@@ -28,14 +28,6 @@ self.addEventListener('activate', (e) => {
                 })
             )
         ).then(() => self.clients.claim())
-         .then(() => self.clients.matchAll({ type: 'window' }))
-         .then((windowClients) => {
-             windowClients.forEach((client) => {
-                 if ('navigate' in client) {
-                     client.navigate(client.url);
-                 }
-             });
-         })
     );
 });
 

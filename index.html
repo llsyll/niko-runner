@@ -9,7 +9,7 @@
     <meta name="description" content="超慢跑节拍器 & 计时助手">
     <meta name="theme-color" content="#000000">
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="style.css?v=5">
+    <link rel="stylesheet" href="style.css?v=6">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
@@ -278,7 +278,7 @@
 
                     <div class="form-group">
                         <label id="client-id-label">OAuth 2.0 Client ID（已内置你的 Web 端凭证）</label>
-                        <input type="text" id="input-client-id" class="text-input"
+                        <input type="text" id="input-client-id" class="text-input" autocomplete="off"
                             value="655421773700-d092c46nis7rrukphe53ssiq0lo4kp9j.apps.googleusercontent.com"
                             placeholder="填入 Google Cloud 或 Fitbit Client ID">
                         <div class="helper-text">
@@ -287,9 +287,9 @@
                     </div>
 
                     <div class="form-group">
-                        <label>Access Token（可选，直接填入可免跳转立即拉取）</label>
-                        <input type="password" id="input-access-token" class="text-input"
-                            placeholder="ya29... 或 Fitbit Bearer Token">
+                        <label>Access Token（授权后自动填充）</label>
+                        <input type="text" id="input-access-token" class="text-input" autocomplete="off"
+                            placeholder="授权后自动获取，或手动粘贴 ya29...">
                     </div>
 
                     <div class="oauth-btn-row">
@@ -340,11 +340,11 @@
         </div>
     </div>
 
-    <script src="main.js?v=5"></script>
+    <script src="main.js?v=6"></script>
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js?v=5').then(reg => {
+                navigator.serviceWorker.register('./sw.js?v=6').then(reg => {
                     reg.update();
                 }).catch(() => {});
             });
