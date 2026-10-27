@@ -524,7 +524,8 @@ class HealthConnector {
     }
 
     loadState() {
-        const defaultClientId = '655421773700-rijiq092u67eun04r23pprf2i5c6d1ou.apps.googleusercontent.com';
+        const defaultClientId = '655421773700-d092c46nis7rrukphe53ssiq0lo4kp9j.apps.googleusercontent.com';
+        const legacyDesktopClientId = '655421773700-rijiq092u67eun04r23pprf2i5c6d1ou.apps.googleusercontent.com';
         const defaults = {
             provider: 'google_fit', // 'google_fit' | 'fitbit'
             clientId: defaultClientId,
@@ -544,10 +545,13 @@ class HealthConnector {
             const raw = localStorage.getItem(this.storageKey);
             if (!raw) return defaults;
             const parsed = JSON.parse(raw);
+            const resolvedClientId = (!parsed.clientId || parsed.clientId === legacyDesktopClientId)
+                ? defaultClientId
+                : parsed.clientId;
             return {
                 ...defaults,
                 ...parsed,
-                clientId: parsed.clientId || defaultClientId,
+                clientId: resolvedClientId,
                 metrics: { ...defaults.metrics, ...(parsed.metrics || {}) }
             };
         } catch (err) {
@@ -564,7 +568,8 @@ class HealthConnector {
     }
 
     getRedirectUri() {
-        return window.location.origin + window.location.pathname;
+        const path = window.location.pathname === '/' ? '' : window.location.pathname;
+        return window.location.origin + path;
     }
 
     // Check URL hash for OAuth 2.0 implicit grant callback (#access_token=...)
