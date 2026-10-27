@@ -573,8 +573,10 @@ class HealthConnector {
     }
 
     getRedirectUri() {
-        const path = window.location.pathname === '/' ? '' : window.location.pathname;
-        return window.location.origin + path;
+        const rawPath = (window.location.pathname === '/' || window.location.pathname === '/index.html')
+            ? ''
+            : window.location.pathname.replace(/\/+$/, '');
+        return (window.location.origin + rawPath).replace(/\/+$/, '');
     }
 
     hasPermanentAuth() {
