@@ -552,11 +552,22 @@ class HealthConnector {
             const resolvedClientId = (!parsed.clientId || parsed.clientId === legacyDesktopClientId)
                 ? defaultClientId
                 : parsed.clientId;
+            // Sanitize out any password-manager autofilled garbage (Google tokens always start with 'ya29.')
+            let cleanAccessToken = (parsed.accessToken || '').trim();
+            if ((parsed.provider || 'google_fit') === 'google_fit' && cleanAccessToken && !cleanAccessToken.startsWith('ya29.')) {
+                cleanAccessToken = '';
+            }
+            let cleanRefreshToken = (parsed.refreshToken || '').trim();
+            if ((parsed.provider || 'google_fit') === 'google_fit' && cleanRefreshToken && !cleanRefreshToken.startsWith('1//')) {
+                cleanRefreshToken = '';
+            }
             return {
                 ...defaults,
                 ...parsed,
                 clientId: resolvedClientId,
                 clientSecret: parsed.clientSecret || defaultClientSecret,
+                accessToken: cleanAccessToken,
+                refreshToken: cleanRefreshToken,
                 metrics: { ...defaults.metrics, ...(parsed.metrics || {}) }
             };
         } catch (err) {
@@ -650,7 +661,7 @@ class HealthConnector {
 
         if (!resp.ok) {
             const errData = await resp.json().catch(() => ({}));
-            throw new Error(`换取永久令牌失败: ${errData.error_description || resp.status}`);
+            throw new Error(`换取永久令牌失败 (${resp.status}): ${errData.error || ''} ${errData.error_description || ''}`.trim());
         }
 
         const data = await resp.json();
@@ -721,7 +732,7 @@ class HealthConnector {
                 'https://www.googleapis.com/auth/fitness.activity.write'
             ].join(' ');
 
-            const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?response_type=code&access_type=offline&prompt=consent&client_id=${encodedClientId}&redirect_uri=${redirectUri}&scope=${encodeURIComponent(scopes)}&include_granted_scopes=true&state=google_fit`;
+            const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?response_type=code&access_type=offline&prompt=consent&client_id=${encodedClientId}&redirect_uri=${redirectUri}&scope=${encodeURIComponent(scopes)}&state=google_fit`;
             window.location.href = authUrl;
         }
     }
@@ -746,9 +757,15 @@ class HealthConnector {
                 return await this.fetchFromGoogleFit(token);
             } catch (err) {
                 // If token expired mid-session and we have a refresh_token, auto-refresh and retry once!
-                if (this.state.refreshToken && String(err.message).includes('401')) {
-                    const newToken = await this.refreshAccessToken();
-                    return await this.fetchFromGoogleFit(newToken);
+                if (String(err.message).includes('401')) {
+                    if (this.state.refreshToken) {
+                        const newToken = await this.refreshAccessToken();
+                        return await this.fetchFromGoogleFit(newToken);
+                    } else {
+                        this.state.accessToken = '';
+                        this.state.isCloudSynced = false;
+                        this.saveState();
+                    }
                 }
                 throw err;
             }
