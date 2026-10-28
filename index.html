@@ -9,7 +9,7 @@
     <meta name="description" content="超慢跑节拍器 & 计时助手">
     <meta name="theme-color" content="#000000">
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="style.css?v=10">
+    <link rel="stylesheet" href="style.css?v=11">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
@@ -190,7 +190,7 @@
                         <span class="vital-val" id="vital-rhr">58 <small>bpm</small></span>
                     </div>
                     <div class="vital-item">
-                        <span class="vital-label">心率变异 HRV</span>
+                        <span class="vital-label">心率变异</span>
                         <span class="vital-val" id="vital-hrv">62 <small>ms</small></span>
                     </div>
                     <div class="vital-item">
@@ -239,21 +239,23 @@
 
             <!-- Prescribed Plan List (Shown when not actively in full-screen player or below) -->
             <div id="strength-plan-container" class="strength-plan-container">
-                <div class="plan-section-header">
-                    <div class="plan-title-group">
-                        <span id="plan-header-title">今日 3+2 黄金处方</span>
+                <div class="plan-toolbar">
+                    <div class="plan-header-row">
+                        <div class="plan-title-group">
+                            <span id="plan-header-title">今日黄金处方</span>
+                            <span id="plan-total-est" class="plan-est-time">约 12 分钟</span>
+                        </div>
                         <span id="plan-progress-badge" class="plan-progress-badge">已完成 0/5</span>
                     </div>
-                    <div class="sets-override-bar" id="sets-override-chips">
-                        <button class="set-pill active" data-sets="auto">智能</button>
-                        <button class="set-pill" data-sets="2">2组</button>
-                        <button class="set-pill" data-sets="3">3组</button>
-                        <button class="set-pill" data-sets="4">4组</button>
+                    <div class="plan-controls-row">
+                        <span class="sets-bar-label">强度组数 · 点动作看图解</span>
+                        <div class="sets-override-bar" id="sets-override-chips">
+                            <button type="button" class="set-pill active" data-sets="auto">智能</button>
+                            <button type="button" class="set-pill" data-sets="2">2组</button>
+                            <button type="button" class="set-pill" data-sets="3">3组</button>
+                            <button type="button" class="set-pill" data-sets="4">4组</button>
+                        </div>
                     </div>
-                </div>
-                <div class="plan-sub-bar">
-                    <span class="plan-usage-hint">💡 点动作可看图解或单独计时，自己数完可直接点右侧 ✓</span>
-                    <span id="plan-total-est" class="plan-est-time">约 12 分钟</span>
                 </div>
 
                 <div id="strength-plan-list" class="strength-plan-list">
@@ -396,11 +398,11 @@
         </div>
     </div>
 
-    <script src="main.js?v=10"></script>
+    <script src="main.js?v=11"></script>
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js?v=10').then(reg => {
+                navigator.serviceWorker.register('./sw.js?v=11').then(reg => {
                     reg.update();
                 }).catch(() => {});
             });

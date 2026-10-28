@@ -288,13 +288,6 @@ class NikoController {
                 this.pause();
                 this.els.time.textContent = "DONE";
                 this.app.audio.playFinish();
-                if (this.app.strength && this.app.strength.health) {
-                    this.app.strength.health.recordWorkoutSession(
-                        `Niko 超慢跑 (${this.durationMinutes}分钟 · ${this.bpm} BPM)`,
-                        this.initialDurationSecs,
-                        56 // Jogging activityType in Google Fit
-                    );
-                }
             }
             return true; // returns true if 1 second tick happened
         }
@@ -539,13 +532,6 @@ class IntervalController {
                 // Ensure progress is full
                 this.elapsedTime = this.totalDuration;
                 this.updateTotalProgress();
-                if (this.app.strength && this.app.strength.health) {
-                    this.app.strength.health.recordWorkoutSession(
-                        `Niko 间歇训练 (${this.totalSets}组)`,
-                        this.totalDuration,
-                        114 // HIIT activityType in Google Fit
-                    );
-                }
                 return;
             } else {
                 // Rest Time
@@ -1029,50 +1015,6 @@ class HealthConnector {
         this.state.lastSyncedAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         this.saveState();
         return this.state.metrics;
-    }
-
-    // Write completed workout session back to Google Fit (activityType: 80 = Strength Training, 56 = Jogging, 114 = HIIT)
-    async recordWorkoutSession(name, durationSecs, activityType = 80) {
-        if (!durationSecs || durationSecs < 10) return;
-        const mins = Math.max(1, Math.round(durationSecs / 60));
-
-        // Update local load minutes so readiness reflects today's effort
-        this.state.metrics.yesterdayLoadMins = (this.state.metrics.yesterdayLoadMins || 0) + mins;
-        this.saveState();
-
-        if (this.state.provider !== 'google_fit' || !this.hasPermanentAuth()) return;
-        try {
-            if (!this.state.accessToken || (this.state.tokenExpiry && Date.now() > this.state.tokenExpiry - 120000)) {
-                await this.refreshAccessToken();
-            }
-            const token = (this.state.accessToken || '').trim();
-            if (!token) return;
-
-            const endTimeMillis = Date.now();
-            const startTimeMillis = endTimeMillis - (durationSecs * 1000);
-            const sessionId = `niko-workout-${endTimeMillis}`;
-
-            await fetch(`https://www.googleapis.com/fitness/v1/users/me/sessions/${sessionId}`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    id: sessionId,
-                    name,
-                    description: '由 Niko 科学超慢跑与力量训练助手记录',
-                    startTimeMillis,
-                    endTimeMillis,
-                    activityType,
-                    application: {
-                        name: 'Niko Runner & Strength'
-                    }
-                })
-            });
-        } catch (err) {
-            console.warn('Google Fit workout session writeback skipped:', err);
-        }
     }
 }
 
@@ -1642,7 +1584,7 @@ class StrengthController {
             vitalLoad: document.getElementById('vital-load'),
 
             focusChips: document.querySelectorAll('#strength-focus-chips .chip-xs'),
-            setsChips: document.querySelectorAll('#sets-override-chips .chip-mini'),
+            setsChips: document.querySelectorAll('#sets-override-chips .set-pill'),
             planHeaderTitle: document.getElementById('plan-header-title'),
             planProgressBadge: document.getElementById('plan-progress-badge'),
             planTotalEst: document.getElementById('plan-total-est'),
@@ -1671,10 +1613,10 @@ class StrengthController {
             // Exercise Guide Modal Elements
             guideModal: document.getElementById('ex-guide-modal'),
             btnCloseGuide: document.getElementById('btn-close-guide'),
-            guideTitle: document.getElementById('guide-ex-title'),
-            guideMuscleTag: document.getElementById('guide-ex-muscle-tag'),
-            guideVolumeTag: document.getElementById('guide-ex-volume-tag'),
-            guideSvgStage: document.getElementById('guide-svg-stage'),
+            guideTitle: document.getElementById('guide-modal-title'),
+            guideMuscleTag: document.getElementById('guide-role-badge'),
+            guideVolumeTag: document.getElementById('guide-prescription-badge'),
+            guideSvgStage: document.getElementById('guide-svg-box'),
             guideSetup: document.getElementById('guide-step-setup'),
             guideExec: document.getElementById('guide-step-exec'),
             guideMistake: document.getElementById('guide-step-mistake'),
@@ -1753,12 +1695,6 @@ class StrengthController {
             if (playSound) {
                 this.app.requestAudio().then(() => this.app.audio.playCheckSound());
             }
-            // Write single exercise completion to Google Fit
-            this.health.recordWorkoutSession(
-                `科学力量：${ex.name} (${ex.sets}组)`,
-                ex.sets * (ex.workSecs + ex.restSecs),
-                80
-            );
         }
         this.saveTodayCompleted();
         this.updateCompletionUI();
@@ -2069,7 +2005,7 @@ class StrengthController {
         this.els.vitalLoad.innerHTML = `${m.yesterdayLoadMins} <small>min</small>`;
 
         // 4. Update Plan Header & Exercise Cards
-        this.els.planTotalEst.textContent = `预计 ${estMinutes} 分钟 · 点动作看图解，可自由选练或打勾`;
+        this.els.planTotalEst.textContent = `约 ${estMinutes} 分钟`;
         this.els.planList.innerHTML = '';
 
         exercises.forEach((ex, idx) => {
@@ -2082,23 +2018,23 @@ class StrengthController {
                     <div class="ex-title-row">
                         <span class="ex-index">${idx + 1}</span>
                         <span class="ex-name">${ex.name}</span>
+                        <span class="ex-guide-hint">图解</span>
+                    </div>
+                    <div class="ex-prescription-row">
+                        <span class="ex-Prescription">${ex.sets}组 × ${ex.workSecs}秒 (休${ex.restSecs}秒)</span>
                         <span class="ex-muscle-tag">${ex.muscle}</span>
                     </div>
                     <div class="ex-cue">${ex.repHint}</div>
                 </div>
                 <div class="ex-card-right">
-                    <div class="ex-right-meta" data-role="open-guide">
-                        <div class="ex-Prescription">${ex.sets}组 × ${ex.workSecs}s</div>
-                        <div class="ex-rest-note">休 ${ex.restSecs}s · 图解</div>
-                    </div>
                     <div class="ex-action-btns">
-                        <button class="ex-mini-btn" type="button" data-role="solo-play" title="单独为这个动作计时跟练">⏱ 单独练</button>
+                        <button class="ex-mini-btn" type="button" data-role="solo-play" title="单独为这个动作计时跟练">⏱ 计时</button>
                         <button class="ex-check-btn${isDone ? ' checked' : ''}" type="button" data-role="toggle-check" title="自己做完直接打勾">✓</button>
                     </div>
                 </div>
             `;
 
-            // Clicking left area or prescription opens the illustrated beginner guide
+            // Clicking left area opens the illustrated beginner guide
             card.querySelectorAll('[data-role="open-guide"]').forEach(el => {
                 el.addEventListener('click', () => this.openExerciseGuide(idx));
             });
@@ -2388,7 +2324,7 @@ class StrengthController {
             this.els.phaseBadge.textContent = '本轮完成';
             this.els.phaseBadge.className = 'phase-pill work';
             if (this.els.rhythmPill) {
-                this.els.rhythmPill.textContent = '已自动打勾记录并同步 Google Fit';
+                this.els.rhythmPill.textContent = '已自动打勾完成本轮动作';
                 this.els.rhythmPill.className = 'rhythm-pill exhale';
             }
             this.els.currentExName.textContent = '太棒了！本轮力量训练已完成';
@@ -2397,12 +2333,6 @@ class StrengthController {
             this.els.totalProgress.style.width = '100%';
             this.els.bottomBar.classList.remove('hidden');
             this.highlightExerciseCard(-1);
-
-            this.health.recordWorkoutSession(
-                'Niko 科学自重力量训练',
-                this.totalWorkoutSecs,
-                80
-            );
             return;
         }
 
